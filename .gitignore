@@ -6,3 +6,17 @@ __pycache__/
 build/
 dist/
 *.log
+
+# Android / Gradle
+*.iml
+.gradle/
+/local.properties
+.idea/
+/build
+/captures
+.externalNativeBuild
+.cxx
+*.apk
+*.ap_
+*.dex
+*.class
