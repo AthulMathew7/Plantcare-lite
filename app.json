@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "PlantCareLite",
+    "slug": "PlantCareLite",
+    "version": "0.1.0",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "PlantCare Lite uses the camera to photograph leaves for disease checks.",
+        "NSPhotoLibraryUsageDescription": "PlantCare Lite uses your photo library so you can pick a leaf image to scan."
+      }
+    },
+    "android": {
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.anonymous.PlantCareLite"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow PlantCare Lite to access photos so you can scan a leaf from your gallery.",
+          "cameraPermission": "Allow PlantCare Lite to use the camera to photograph leaves."
+        }
+      ],
+      "expo-sqlite",
+      "expo-splash-screen",
+      "onnxruntime-react-native",
+      "./plugins/withOnnxruntimePackage"
+    ]
+  }
+}
