@@ -1,9 +1,12 @@
 import React from 'react';
 import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import colors from '../constants/colors';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 import { font, fontSize } from '../constants/typography';
 
 export default function LoadingSpinner({ message = 'Loading…' }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(baseStyles);
   return (
     <View style={styles.container}>
       <ActivityIndicator size="large" color={colors.sage} />
@@ -12,7 +15,7 @@ export default function LoadingSpinner({ message = 'Loading…' }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',

@@ -2,17 +2,10 @@ import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
 import { Leaf, Sprout, MoreVertical } from 'lucide-react-native';
 import colors from '../constants/colors';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 import { font, softShadow, fontSize } from '../constants/typography';
 
-function getStatusColor(scan) {
-  if (scan.is_uncertain) return colors.statusUncertain;
-  if (typeof scan.disease_class === 'string' && scan.disease_class.endsWith('Healthy')) {
-    return colors.statusHealthy;
-  }
-  return colors.statusDiseased;
-}
-
-function pickIcon(scan) {
+function pickIcon(scan, colors) {
   const cls = (scan.disease_class || '').toLowerCase();
   if (cls.includes('healthy')) {
     return <Sprout size={16} color={colors.forest} strokeWidth={2} />;
@@ -21,7 +14,13 @@ function pickIcon(scan) {
 }
 
 export default function HistoryListItem({ scan, onPress, onLongPress }) {
-  const statusColor = getStatusColor(scan);
+  const { colors } = useTheme();
+  const styles = useThemedStyles(baseStyles);
+  const statusColor = scan.is_uncertain
+    ? colors.statusUncertain
+    : scan.disease_class?.endsWith('Healthy')
+      ? colors.statusHealthy
+      : colors.statusDiseased;
 
   return (
     <TouchableOpacity
@@ -32,7 +31,7 @@ export default function HistoryListItem({ scan, onPress, onLongPress }) {
     >
       {/* Icon */}
       <View style={styles.iconWrap}>
-        {pickIcon(scan)}
+        {pickIcon(scan, colors)}
       </View>
 
       {/* Name + date */}
@@ -52,7 +51,7 @@ export default function HistoryListItem({ scan, onPress, onLongPress }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',

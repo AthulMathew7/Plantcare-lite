@@ -16,14 +16,19 @@ import {
   getSyncPreference,
   toggleSyncPreference,
 } from '../services/database';
+import { useAuth } from '../context/AuthContext';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 import colors from '../constants/colors';
 import { font, softShadow, fontSize } from '../constants/typography';
 
 const APP_VERSION = Constants.expoConfig?.version || '0.1.0';
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }) {
+  const { colors: themeColors, isDark, setThemeMode } = useTheme();
+  const styles = useThemedStyles(baseStyles);
   const [syncEnabled, setSyncEnabled] = useState(false);
   const insets = useSafeAreaInsets();
+  const { user, signOut } = useAuth();
 
   useEffect(() => {
     getSyncPreference()
@@ -41,10 +46,17 @@ export default function SettingsScreen() {
     }
   }, []);
 
+  const handleToggleTheme = useCallback((enabled) => {
+    setThemeMode(enabled ? 'dark' : 'light').catch((error) => {
+      console.error('[PlantCare][Theme] Could not save theme preference:', error);
+      Alert.alert('Error', 'Could not save the appearance preference.');
+    });
+  }, [setThemeMode]);
+
   const handleClearHistory = useCallback(() => {
     Alert.alert(
       'Clear all history',
-      'This will permanently delete every scan record. This cannot be undone.',
+      'This will clear scan history for this account on this device. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -63,6 +75,26 @@ export default function SettingsScreen() {
     );
   }, []);
 
+  const handleSignOut = useCallback(() => {
+    Alert.alert(
+      'Log out',
+      'Your local scans and images will remain on this device.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log out',
+          onPress: async () => {
+            try {
+              await signOut();
+            } catch (err) {
+              Alert.alert('Could not log out', err.message || 'Please try again.');
+            }
+          },
+        },
+      ],
+    );
+  }, [signOut]);
+
   return (
     <View style={styles.screen}>
       {/* ── Header ───────────────────────────────────────────────── */}
@@ -80,7 +112,7 @@ export default function SettingsScreen() {
         {/* ── Profile card ─────────────────────────────────────── */}
         <View style={styles.profileCard}>
           <View style={styles.avatar}>
-            <Leaf size={22} color={colors.sage} strokeWidth={2} />
+            <Leaf size={22} color={themeColors.sage} strokeWidth={2} />
           </View>
           <View>
             <Text style={styles.profileName}>PlantCare</Text>
@@ -88,7 +120,71 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        <Text style={styles.sectionLabel}>Account</Text>
+        <View style={styles.groupCard}>
+          {user ? (
+            <>
+              <View style={styles.groupRow}>
+                <Text style={styles.rowLabel}>Signed in as</Text>
+                <Text style={styles.rowValue} numberOfLines={1}>{user.displayName}</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.groupRow}>
+                <Text style={styles.rowLabel}>Email</Text>
+                <Text style={styles.rowValue} numberOfLines={1}>{user.email}</Text>
+              </View>
+              <View style={styles.divider} />
+              <TouchableOpacity
+                style={styles.dangerRow}
+                onPress={handleSignOut}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Log out"
+              >
+                <Text style={styles.dangerLabel}>Log out</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={styles.groupRow}>
+                <Text style={styles.rowLabel}>Status</Text>
+                <Text style={styles.rowValue}>Guest mode</Text>
+              </View>
+              <View style={styles.divider} />
+              <TouchableOpacity
+                style={styles.accountAction}
+                onPress={() => navigation.navigate('Auth')}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Log in or create an account"
+              >
+                <Text style={styles.accountActionLabel}>Log in / Create account</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
         {/* ── Preferences section ──────────────────────────────── */}
+        <Text style={styles.sectionLabel}>Appearance</Text>
+        <View style={styles.groupCard}>
+          <View style={styles.groupRow}>
+            <View>
+              <Text style={styles.rowLabel}>Dark Mode</Text>
+              <Text style={styles.appearanceHint}>{isDark ? 'Dark mode' : 'Light mode'}</Text>
+            </View>
+            <Switch
+              value={isDark}
+              onValueChange={handleToggleTheme}
+              trackColor={{ false: '#E5E7EB', true: themeColors.sage }}
+              thumbColor={isDark ? '#FFFFFF' : '#F9FAFB'}
+              ios_backgroundColor="#E5E7EB"
+              accessibilityRole="switch"
+              accessibilityLabel="Dark Mode"
+              accessibilityState={{ checked: isDark }}
+            />
+          </View>
+        </View>
+
         <Text style={styles.sectionLabel}>Preferences</Text>
         <View style={styles.groupCard}>
 
@@ -98,8 +194,8 @@ export default function SettingsScreen() {
             <Switch
               value={syncEnabled}
               onValueChange={handleToggleSync}
-              trackColor={{ false: '#E5E7EB', true: colors.sage }}
-              thumbColor={syncEnabled ? colors.cardBg : '#F9FAFB'}
+              trackColor={{ false: '#E5E7EB', true: themeColors.sage }}
+              thumbColor={syncEnabled ? themeColors.cardBg : '#F9FAFB'}
               ios_backgroundColor="#E5E7EB"
               accessibilityRole="switch"
               accessibilityLabel="Sync history when online"
@@ -119,8 +215,8 @@ export default function SettingsScreen() {
           <View style={styles.groupRow}>
             <Text style={styles.rowLabel}>Offline AI Engine</Text>
             <View style={styles.rowValueWrap}>
-              <Cpu size={13} color={colors.sage} strokeWidth={2} />
-              <Text style={styles.rowValue}>Active (MobileNetV2)</Text>
+              <Cpu size={13} color={themeColors.sage} strokeWidth={2} />
+              <Text style={styles.rowValue}>Active (MobileNetV3Large • ONNX)</Text>
             </View>
           </View>
 
@@ -144,7 +240,7 @@ export default function SettingsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Clear all history"
           >
-            <Trash2 size={16} color={colors.coral} strokeWidth={2} />
+            <Trash2 size={16} color={themeColors.coral} strokeWidth={2} />
             <Text style={styles.dangerLabel}>Clear all history</Text>
           </TouchableOpacity>
         </View>
@@ -154,9 +250,9 @@ export default function SettingsScreen() {
         <View style={styles.groupCard}>
           <View style={styles.groupRow}>
             <View style={styles.aboutRow}>
-              <Info size={14} color={colors.subtleText} strokeWidth={1.8} />
+              <Info size={14} color={themeColors.subtleText} strokeWidth={1.8} />
               <Text style={styles.aboutText}>
-                PlantCare • Open-source crop health tool. Diagnosis runs fully on-device with no data uploaded.
+                PlantCare • Open-source crop health tool. Diagnosis runs fully on-device; scan history and photos stay on this device. Account sign-in is provided by Firebase.
               </Text>
             </View>
           </View>
@@ -167,7 +263,7 @@ export default function SettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.cream,
@@ -269,6 +365,8 @@ const styles = StyleSheet.create({
     fontFamily: font(500),
     fontSize: fontSize.sm,
     color: '#9CA3AF',
+    flexShrink: 1,
+    textAlign: 'right',
   },
   mono: {
     fontFamily: font(400),
@@ -290,6 +388,12 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontStyle: 'italic',
   },
+  appearanceHint: {
+    fontFamily: font(400),
+    fontSize: fontSize.xs,
+    color: '#9CA3AF',
+    marginTop: 3,
+  },
 
   // ── Danger row ────────────────────────────────────────────────
   dangerRow: {
@@ -303,6 +407,16 @@ const styles = StyleSheet.create({
     fontFamily: font(600),
     fontSize: fontSize.sm,
     color: colors.coral,
+  },
+  accountAction: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  accountActionLabel: {
+    color: colors.forest,
+    fontFamily: font(600),
+    fontSize: fontSize.sm,
   },
 
   // ── About row ─────────────────────────────────────────────────

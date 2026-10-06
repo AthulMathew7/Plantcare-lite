@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -23,7 +23,12 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ConfidenceBadge from '../components/ConfidenceBadge';
 import SeverityBadge from '../components/SeverityBadge';
 import { runInference, MODEL_VERSION } from '../services/inferenceService';
-import { lookupDiseaseInfo, saveScanToHistory } from '../services/database';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
+import {
+  lookupDiseaseInfo,
+  saveScanToHistory,
+  setHistoryItemUncertain,
+} from '../services/database';
 import colors from '../constants/colors';
 import { font, radius, softShadow, fontSize } from '../constants/typography';
 
@@ -34,6 +39,8 @@ const SEVERITY_LABELS = {
 };
 
 export default function ResultScreen({ route, navigation }) {
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(baseStyles);
   const { imageUri, historyMode = false, scanData = null } = route.params || {};
   const insets = useSafeAreaInsets();
 
@@ -42,8 +49,52 @@ export default function ResultScreen({ route, navigation }) {
   const [inferenceResult, setInferenceResult] = useState(null);
   const [diseaseInfo, setDiseaseInfo] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [savedScanId, setSavedScanId] = useState(null);
+  const [saveError, setSaveError] = useState(null);
   const [isUncertain, setIsUncertain] = useState(scanData?.is_uncertain === 1);
   const [retryKey, setRetryKey] = useState(0);
+  const uncertainRef = useRef(scanData?.is_uncertain === 1);
+  const savePromiseRef = useRef(null);
+  const savedScanIdRef = useRef(null);
+
+  const saveResult = useCallback(async (result) => {
+    if (savePromiseRef.current) return savePromiseRef.current;
+    if (savedScanIdRef.current) return { id: savedScanIdRef.current };
+
+    const savePromise = (async () => {
+      setSaving(true);
+      setSaveError(null);
+      try {
+        const savedScan = await saveScanToHistory(
+          imageUri,
+          result.diseaseClass,
+          result.confidence,
+          uncertainRef.current,
+          MODEL_VERSION,
+        );
+        savedScanIdRef.current = savedScan.id;
+        setSavedScanId(savedScan.id);
+        if (uncertainRef.current) {
+          try {
+            await setHistoryItemUncertain(savedScan.id, true);
+          } catch (err) {
+            console.error('[PlantCare][Result] UNCERTAINTY UPDATE FAILED:', err.message || err);
+            Alert.alert('Scan saved', 'Could not mark this scan as uncertain. Please try again.');
+          }
+        }
+        return savedScan;
+      } catch (err) {
+        setSaveError(err.message || 'Could not save scan.');
+        console.error('[PlantCare][Result] SAVE FAILED:', err.message || err);
+        return null;
+      } finally {
+        setSaving(false);
+        savePromiseRef.current = null;
+      }
+    })();
+    savePromiseRef.current = savePromise;
+    return savePromise;
+  }, [imageUri]);
 
   useEffect(() => {
     if (historyMode && scanData) {
@@ -74,6 +125,7 @@ export default function ResultScreen({ route, navigation }) {
           modelVersion: result.modelVersion,
         });
         setInferenceResult(result);
+        void saveResult(result);
         const info = await lookupDiseaseInfo(result.diseaseClass);
         if (!cancelled) setDiseaseInfo(info);
       } catch (err) {
@@ -89,33 +141,27 @@ export default function ResultScreen({ route, navigation }) {
 
     run();
     return () => { cancelled = true; };
-  }, [imageUri, historyMode, scanData, retryKey]);
+  }, [imageUri, historyMode, scanData, retryKey, saveResult]);
 
-  const onFlagUncertain = useCallback(() => {
+  const onFlagUncertain = useCallback(async () => {
+    uncertainRef.current = true;
     setIsUncertain(true);
-    Alert.alert('Flagged as uncertain', 'This scan will be marked uncertain when saved.');
-  }, []);
+    if (savedScanId) {
+      try {
+        await setHistoryItemUncertain(savedScanId, true);
+      } catch (err) {
+        Alert.alert('Could not update scan', err.message || 'Please try again.');
+        return;
+      }
+    }
+    Alert.alert('Flagged as uncertain', 'This scan is marked uncertain in your history.');
+  }, [savedScanId]);
 
   const onSave = useCallback(async () => {
-    if (!inferenceResult) return;
-    setSaving(true);
-    try {
-      await saveScanToHistory(
-        imageUri,
-        inferenceResult.diseaseClass,
-        inferenceResult.confidence,
-        isUncertain,
-        MODEL_VERSION,
-      );
-      Alert.alert('Saved', 'Scan saved to your history.', [
-        { text: 'OK', onPress: () => navigation.popToTop() },
-      ]);
-    } catch (err) {
-      Alert.alert('Error', err.message || 'Could not save scan.');
-    } finally {
-      setSaving(false);
-    }
-  }, [inferenceResult, imageUri, isUncertain, navigation]);
+    if (!inferenceResult || savedScanId) return;
+    const result = await saveResult(inferenceResult);
+    if (result) Alert.alert('Saved', 'Scan saved to your history.');
+  }, [inferenceResult, savedScanId, saveResult]);
 
   const onShare = useCallback(async () => {
     try {
@@ -185,11 +231,19 @@ export default function ResultScreen({ route, navigation }) {
   }
 
   const treatmentSteps = diseaseInfo?.treatment
-    ? diseaseInfo.treatment.split('. ').filter(Boolean)
+    ? diseaseInfo.treatment.split(/(?<=[.])\s+/).filter(Boolean)
     : [];
 
   const displayName = diseaseInfo?.display_name || inferenceResult.diseaseClass;
   const severityLabel = SEVERITY_LABELS[diseaseInfo?.severity] || null;
+  const headerImageSource = imageUri ? { uri: imageUri } : null;
+  const detailSections = [
+    { title: 'Symptoms', content: diseaseInfo?.symptoms || diseaseInfo?.description },
+    { title: 'Cause', content: diseaseInfo?.cause },
+    { title: 'Recommended care', content: diseaseInfo?.treatment },
+    { title: 'Prevention', content: diseaseInfo?.prevention },
+    { title: 'Cure status', content: diseaseInfo?.cure_status },
+  ];
 
   return (
     <View style={styles.fullScreen}>
@@ -200,9 +254,9 @@ export default function ResultScreen({ route, navigation }) {
       >
         {/* ── Image header ───────────────────────────────────────── */}
         <View style={styles.imageHeader}>
-          {imageUri ? (
+          {headerImageSource ? (
             <Image
-              source={{ uri: imageUri }}
+              source={headerImageSource}
               style={styles.headerImage}
               resizeMode="cover"
             />
@@ -244,6 +298,9 @@ export default function ResultScreen({ route, navigation }) {
                   <Text style={styles.typeLabel}>{severityLabel.toUpperCase()}</Text>
                 )}
                 <Text style={styles.diseaseName}>{displayName}</Text>
+                {diseaseInfo?.crop && (
+                  <Text style={styles.cropLabel}>{diseaseInfo.crop}</Text>
+                )}
                 {diseaseInfo?.description && (
                   <Text style={styles.diseaseDesc} numberOfLines={3}>
                     {diseaseInfo.description}
@@ -253,18 +310,29 @@ export default function ResultScreen({ route, navigation }) {
               <View style={styles.badgesWrap}>
                 <ConfidenceBadge confidence={inferenceResult.confidence} />
                 {diseaseInfo?.severity && (
-                  <SeverityBadge severity={diseaseInfo.severity} />
+                  <SeverityBadge severity={diseaseInfo.severity} isDark={isDark} themeColors={colors} />
                 )}
               </View>
             </View>
           </View>
 
-          {/* Treatment steps card */}
+          {detailSections.map((section) => (
+            section.content ? (
+              <View key={section.title} style={styles.card}>
+                <View style={styles.treatmentHeader}>
+                  <ShieldCheck size={16} color={colors.sage} strokeWidth={2.5} />
+                  <Text style={styles.treatmentTitle}>{section.title}</Text>
+                </View>
+                <Text style={styles.detailText}>{section.content}</Text>
+              </View>
+            ) : null
+          ))}
+
           {treatmentSteps.length > 0 && (
             <View style={styles.card}>
               <View style={styles.treatmentHeader}>
                 <ShieldCheck size={16} color={colors.sage} strokeWidth={2.5} />
-                <Text style={styles.treatmentTitle}>Recommended Care</Text>
+                <Text style={styles.treatmentTitle}>Action checklist</Text>
               </View>
               {treatmentSteps.map((step, i) => (
                 <View key={i} style={styles.stepRow}>
@@ -293,13 +361,15 @@ export default function ResultScreen({ route, navigation }) {
           <TouchableOpacity
             style={styles.saveBtn}
             onPress={onSave}
-            disabled={saving}
+            disabled={saving || Boolean(savedScanId)}
             accessibilityRole="button"
             accessibilityLabel="Save scan to history"
             activeOpacity={0.8}
           >
             <Bookmark size={16} color={colors.forest} strokeWidth={2} />
-            <Text style={styles.saveBtnText}>{saving ? 'Saving…' : 'Save'}</Text>
+            <Text style={styles.saveBtnText}>
+              {savedScanId ? 'Saved' : saving ? 'Saving…' : saveError ? 'Retry save' : 'Save'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -315,13 +385,18 @@ export default function ResultScreen({ route, navigation }) {
               {isUncertain ? 'Flagged' : 'Flag uncertain'}
             </Text>
           </TouchableOpacity>
+          {saveError && (
+            <Text accessibilityRole="alert" style={styles.saveError}>
+              {saveError}
+            </Text>
+          )}
         </View>
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   fullScreen: {
     flex: 1,
     backgroundColor: colors.cream,
@@ -391,12 +466,30 @@ const styles = StyleSheet.create({
     color: '#111827',
     lineHeight: 28,
   },
+  cropLabel: {
+    fontFamily: font(700),
+    fontSize: 10,
+    color: colors.forest,
+    backgroundColor: '#E8F5EA',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginTop: 4,
+    alignSelf: 'flex-start',
+    overflow: 'hidden',
+  },
   diseaseDesc: {
     fontFamily: font(400),
     fontSize: fontSize.xs,
     color: '#9CA3AF',
     marginTop: 3,
     lineHeight: 17,
+  },
+  detailText: {
+    fontFamily: font(400),
+    fontSize: fontSize.sm,
+    color: '#374151',
+    lineHeight: 20,
   },
   treatmentHeader: {
     flexDirection: 'row',
@@ -466,6 +559,12 @@ const styles = StyleSheet.create({
     fontFamily: font(700),
     fontSize: fontSize.sm,
     color: colors.forest,
+  },
+  saveError: {
+    flexBasis: '100%',
+    color: colors.coral,
+    fontFamily: font(600),
+    fontSize: fontSize.xs,
   },
   flagBtn: {
     flex: 2,

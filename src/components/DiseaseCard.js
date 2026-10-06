@@ -4,6 +4,7 @@ import colors from '../constants/colors';
 import ConfidenceBadge from './ConfidenceBadge';
 import SeverityBadge from './SeverityBadge';
 import { font, softShadow, fontSize } from '../constants/typography';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 
 const SEVERITY_LABELS = {
   none: 'Healthy Plant',
@@ -16,6 +17,8 @@ const SEVERITY_LABELS = {
  * The full result detail layout is now built directly in ResultScreen.
  */
 export default function DiseaseCard({ imageUri, displayName, confidence, description, severity }) {
+  const { colors, isDark } = useTheme();
+  const styles = useThemedStyles(baseStyles);
   const severityLabel = SEVERITY_LABELS[severity];
 
   return (
@@ -34,7 +37,7 @@ export default function DiseaseCard({ imageUri, displayName, confidence, descrip
 
         <View style={styles.metaRow}>
           <ConfidenceBadge confidence={confidence} />
-          {severity ? <SeverityBadge severity={severity} /> : null}
+          {severity ? <SeverityBadge severity={severity} isDark={isDark} themeColors={colors} /> : null}
         </View>
 
         {description ? (
@@ -45,7 +48,7 @@ export default function DiseaseCard({ imageUri, displayName, confidence, descrip
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   card: {
     backgroundColor: colors.cardBg,
     borderRadius: 24,

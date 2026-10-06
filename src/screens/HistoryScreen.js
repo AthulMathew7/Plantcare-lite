@@ -14,9 +14,16 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import { Leaf, Sprout, MoreVertical, ChevronLeft } from 'lucide-react-native';
 import EmptyState from '../components/EmptyState';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { loadHistory, deleteHistoryItem, restoreHistoryItem } from '../services/database';
+import {
+  getActiveLocalUserId,
+  loadHistory,
+  deleteHistoryItem,
+  restoreHistoryItem,
+} from '../services/database';
 import { formatRelativeDate } from '../utils/dateUtils';
+import { subscribeToHistoryFocus } from '../services/historyNavigation';
 import colors from '../constants/colors';
 import { font, radius, softShadow, fontSize } from '../constants/typography';
 
@@ -41,7 +48,7 @@ function groupByDate(items) {
   return sections;
 }
 
-function pickIcon(scan) {
+function pickIcon(scan, colors) {
   const cls = scan.disease_class || '';
   if (cls.toLowerCase().includes('healthy')) {
     return <Sprout size={16} color={colors.forest} strokeWidth={2} />;
@@ -55,6 +62,8 @@ function isSynced(scan) {
 }
 
 export default function HistoryScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(baseStyles);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -65,9 +74,14 @@ export default function HistoryScreen({ navigation }) {
 
   const refresh = useCallback(async () => {
     const showSpinner = firstLoadRef.current;
+    console.log('[PlantCare][History] RELOAD:', {
+      activeLocalUserId: getActiveLocalUserId(),
+      firstLoad: showSpinner,
+    });
     if (showSpinner) setLoading(true);
     try {
       const rows = await loadHistory();
+      console.log('[PlantCare][History] ROWS RECEIVED:', rows.length);
       setHistory(
         rows.map((row) => ({
           ...row,
@@ -76,7 +90,8 @@ export default function HistoryScreen({ navigation }) {
         })),
       );
     } catch (err) {
-      Alert.alert('Error', 'Failed to load scan history.');
+      console.error('[PlantCare][History] RELOAD FAILED:', err.message || err);
+      Alert.alert('Error', err.message || 'Failed to load scan history.');
     } finally {
       firstLoadRef.current = false;
       setLoading(false);
@@ -93,8 +108,7 @@ export default function HistoryScreen({ navigation }) {
   }, [refresh]);
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', refresh);
-    return unsubscribe;
+    return subscribeToHistoryFocus(navigation, refresh);
   }, [navigation, refresh]);
 
   useEffect(() => {
@@ -254,7 +268,7 @@ export default function HistoryScreen({ navigation }) {
                     />
                   ) : (
                     <View style={styles.itemIconWrap}>
-                      {pickIcon(item)}
+                      {pickIcon(item, colors)}
                     </View>
                   )}
                 </View>
@@ -307,7 +321,7 @@ export default function HistoryScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.cream,

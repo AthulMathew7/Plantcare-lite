@@ -3,12 +3,15 @@ import { View, Image, Text, StyleSheet } from 'react-native';
 import { Leaf } from 'lucide-react-native';
 import colors from '../constants/colors';
 import { font, softShadow, fontSize } from '../constants/typography';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 
 /**
  * ImagePreview — standalone preview component (kept for potential reuse).
  * The CaptureScreen now renders its own inline preview.
  */
 export default function ImagePreview({ uri, placeholder }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(baseStyles);
   if (placeholder || !uri) {
     return (
       <View style={styles.placeholder}>
@@ -26,7 +29,7 @@ export default function ImagePreview({ uri, placeholder }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   placeholder: {
     height: 240,
     borderRadius: 24,

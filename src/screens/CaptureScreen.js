@@ -12,10 +12,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Camera, ImageIcon, Leaf, ScanLine, Lightbulb, X } from 'lucide-react-native';
 import { persistScanImage } from '../services/imageStorage';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 import colors from '../constants/colors';
 import { font, radius, softShadow, fontSize } from '../constants/typography';
 
 export default function CaptureScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(baseStyles);
   const [imageUri, setImageUri] = useState(null);
   const [pickerLoading, setPickerLoading] = useState(false);
   const [showTip, setShowTip] = useState(true);
@@ -250,7 +253,7 @@ export default function CaptureScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.cream,

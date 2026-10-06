@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import colors from '../constants/colors';
+import { useThemedStyles } from '../context/ThemeContext';
 import { font, fontSize } from '../constants/typography';
 
 function getConfidenceLabel(confidence) {
@@ -10,6 +11,7 @@ function getConfidenceLabel(confidence) {
 }
 
 export default function ConfidenceBadge({ confidence }) {
+  const styles = useThemedStyles(baseStyles);
   const pct = Math.round((confidence || 0) * 100);
 
   return (
@@ -19,7 +21,7 @@ export default function ConfidenceBadge({ confidence }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   badge: {
     backgroundColor: '#D1FAE5', // emerald-100 equiv
     borderRadius: 9999,

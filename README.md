@@ -1,143 +1,207 @@
-# PlantCare Lite
+# PlantCareLite
 
-Offline-first plant disease detection app for **Rice** and **Cassava** crops.  
-Point your phone at a leaf → get an instant diagnosis with treatment recommendations.
+PlantCareLite is an Android-first Expo/React Native application for on-device
+classification of leaf photographs into 22 disease or healthy-condition classes
+covering cassava, coconut, jackfruit, mango, and rice. The app pairs its
+on-device prediction with a local disease-information catalog and locally saved
+scan history.
 
-> **Status:** The app runs on-device inference with the PlantCare ONNX model.
+## Problem and purpose
 
----
+Plant symptoms can be difficult to distinguish, while connectivity and access
+to specialist advice may be limited. PlantCareLite offers a convenient
+photo-based first-look aid: select or capture a leaf image, run the bundled
+model locally, inspect the predicted class and confidence, and consult
+management information. It is intended for farmers, gardeners, students, and
+demonstration/testing use—not as a confirmed agricultural diagnosis.
 
-## Features
+## Current capabilities
 
-- **Capture** — take a photo or pick from gallery
-- **Diagnosis** — (mock) classifies 10 disease classes across Rice & Cassava
-- **History** — browse past scans with status dots and relative timestamps
-- **Settings** — sync preference, clear history, app info
-- **Offline** — scans stored in local SQLite; photos copied into app documents
+- Capture a photograph with the camera or choose one from the gallery.
+- Run a bundled MobileNetV3Large ONNX classifier on-device.
+- Present the top class, model confidence, catalog severity, and disease
+  information.
+- Browse/filter 22 disease and healthy-condition entries; expand one card at a
+  time to read the complete information.
+- Automatically save successful predictions and the actual source photograph
+  to local SQLite-backed history; browse, inspect, flag uncertainty, and
+  soft-delete/undo history entries.
+- Use a persistent local Guest profile without Firebase configuration.
+- Optionally sign up/sign in with Firebase Authentication and associate the
+  Firebase identity with a local SQLite profile.
+- Select Light or Dark appearance; the preference persists locally.
 
-## Design system
+Cloud scan synchronization is **not implemented**. The Settings preference
+and SQLite queue are scaffolding only; no uploader, server API, or cloud
+history restore is present.
 
-| Token | Hex | Usage |
-|---|---|---|
-| Forest (primary) | `#2C5F2D` | Buttons, headers, accent |
-| Moss (primary light) | `#97BC62` | Switch tracks, highlights |
-| Moss light (bg tint) | `#E4EEDB` | Screen backgrounds |
-| Ink (text) | `#1E2A1E` | Headings, body text |
-| Secondary text | `#5F5E5A` | Hints, subtitles, dates |
-| Border | `#D8DED8` | Dividers, input outlines |
-| Coral (alert) | `#D85A30` | Low-confidence badges, warnings |
+## Architecture at a glance
 
-Rounded corners (10–14 px), soft card shadows, generous whitespace.
-
-## Quick start
-
-```bash
-# 1. Install JS dependencies
-npm install
-
-# 2. Build and install the custom Android development client (needs Android SDK)
-npm run android
-
-# 3. Start Metro for the custom development client
-npm start
-
-# Web
-npm run web
+```text
+Expo / React Native screens
+  ├── capture and diagnosis navigation
+  ├── disease catalog and local reference assets
+  └── result/history with user's persisted scan image
+       ├── inferenceService → ONNX Runtime React Native → bundled ONNX model
+       ├── database service → expo-sqlite → plantcare.db
+       ├── imageStorage → app documents/scans/
+       ├── AuthContext → Firebase Authentication + local SQLite user
+       └── ThemeContext → AsyncStorage preference
 ```
 
-ONNX Runtime is a native module, so scanning will not work in Expo Go. Use the
-custom development client installed by `npm run android`. Rebuild it after
-adding or changing native modules. iOS is not the primary target (Android-first)
-but `npm run ios` builds the custom client if Xcode is set up.
+The disease reference photo is catalog content. A result hero and a History
+thumbnail/detail use the actual image selected or captured for that scan; the
+catalog photograph does not replace it. See
+[assets and image handling](./docs/assets_and_images.md).
 
-## Project structure
+## Machine-learning model
 
-```
-App.js                              # Root: gestures, safe area, DB init
-index.js                            # Expo registerRootComponent
-src/
-  constants/
-    colors.js                       # Design system palette
-    diseaseInfo.js                  # 10-class seed data (5 Rice + 5 Cassava)
-  services/
-    database.js                     # SQLite: schema, CRUD, lookups
-    imageStorage.js                 # Persist scan photos in app documents
-    inferenceService.js             # Mock inference stub (swap for TFLite)
-  components/
-    PrimaryButton.js                # Filled forest-green button
-    SecondaryButton.js              # Outlined button
-    ConfidenceBadge.js              # Color-coded confidence pill
-    DiseaseCard.js                  # Image + diagnosis + description
-    HistoryListItem.js              # Scan history row
-    EmptyState.js                   # Empty list placeholder
-    LoadingSpinner.js               # Centered loading indicator
-    ImagePreview.js                 # Capture area / image display
-  screens/
-    CaptureScreen.js                # Home: camera/gallery + preview
-    ResultScreen.js                 # Inference result + treatment + save
-    HistoryScreen.js                # Past scans list
-    SettingsScreen.js               # App info, sync, clear history
-  navigation/
-    AppNavigator.js                 # Bottom tabs + nested Capture stack
-```
+The mobile app loads `assets/models/plantcare/model.onnx` with
+`onnxruntime-react-native`. Inference preprocessing center-crops an image to a
+square, resizes to 224 × 224, decodes RGB pixels, and supplies float32 raw RGB
+values in the range 0–255 in `[1, 224, 224, 3]` NHWC layout. The service
+validates 22 output values and their probability sum, chooses the maximum, and
+returns its class and rounded probability. Do not interpret the score as a
+field-validated probability of correctness. No production-device accuracy
+claim is made. Details and the exact output order are in
+[machine_learning.md](./docs/machine_learning.md).
 
-## Architecture notes
+## Data and identity
 
-### Navigation
+SQLite (`plantcare.db`, via `expo-sqlite`) stores local profiles, the seeded
+disease catalog, scan records, settings, and the future-sync queue. Scan image
+files are copied to the app documents `scans/` directory; thumbnails are
+generated where supported. Firebase handles email/password identity only.
+Firebase does not store scan records or photos. See [database.md](./docs/database.md)
+and [authentication.md](./docs/authentication.md).
 
-```
-BottomTabNavigator
-├── Capture → NativeStackNavigator
-│   ├── CaptureHome (default)
-│   └── Result (pushed after scan)
-├── History (tab)
-└── Settings (tab)
-```
+## Supported classes and reference photos
 
-Tapping a history item navigates cross-tab into the Capture stack's Result
-screen with `historyMode: true` — inference is skipped and action buttons
-are hidden. Tapping the Capture tab returns to CaptureHome.
+There are 22 classes in the model/catalog order: 5 Cassava, 2 Coconut,
+3 Jackfruit, 8 Mango, and 4 Rice. Each class maps to a local bundled image.
+Source/attribution notes—including four images supplied by the project owner
+whose public license has not been verified—are maintained in
+[disease_image_sources.md](./docs/disease_image_sources.md). The full ordered
+catalog is documented in [disease_catalog.md](./docs/disease_catalog.md).
 
-### Database (SQLite)
+## Technology
 
-Tables: `users`, `scan_history`, `disease_info`, `sync_queue`, `app_settings`.  
-See [database_schema.md](./database_schema.md) for full schema and column details.
-
-`disease_info` is auto-seeded on first launch with 10 disease classes.
-Scan images are copied into the app documents directory before insert.
-
-### On-device inference
-
-`src/services/inferenceService.js` preprocesses images and runs the bundled
-ONNX model through `onnxruntime-react-native`. It exports:
-
-```ts
-runInference(imageUri: string) → Promise<{
-  diseaseClass: string,
-  confidence: number,
-  crop: string,
-  condition: string,
-  modelVersion: string
-}>
-```
-
-This native runtime requires a custom development or production build; Expo Go
-does not include its native module.
-
-## Key dependencies
-
-| Package | Purpose |
+| Area | Current implementation |
 |---|---|
-| `expo` ~57 | Tooling and native modules |
-| `react-native` 0.86 | Core framework |
-| `@react-navigation/*` v6 | Bottom tabs + nested stacks |
-| `expo-sqlite` | Local SQLite database |
-| `expo-image-picker` | Camera + gallery access |
-| `expo-file-system` | Persistent scan photo copies |
-| `react-native-gesture-handler` | Swipe-to-delete and navigation gestures |
-| `react-native-safe-area-context` | Safe area insets |
-| `react-native-screens` | Native screen containers |
+| App framework | Expo SDK `~57.0.26`, React Native `0.86.3`, React `19.2.3` |
+| Navigation | React Navigation native stack and bottom tabs; custom floating tab bar |
+| Local database | `expo-sqlite` |
+| Inference | `onnxruntime-react-native`, bundled ONNX model, `jpeg-js` decoding |
+| Camera/gallery | `expo-image-picker` |
+| Image persistence/manipulation | Expo FileSystem legacy API, `expo-image-manipulator` |
+| Authentication | Firebase Authentication email/password |
+| Preferences | React Native AsyncStorage (Firebase auth persistence and theme) |
+| UI | React Native, Lucide icons, Plus Jakarta Sans fonts |
+| Tests/lint | Jest with `jest-expo`, ESLint |
 
-## License
+Exact dependency declarations are in [package.json](./package.json).
 
-TBD — internal project for now.
+## Setup and run
+
+Prerequisites include Node.js/npm, Android Studio/Android SDK, a supported
+Android device or emulator, and a custom development build for native ONNX
+Runtime. Expo Go does not include that native module.
+
+```powershell
+# From the project root
+npm install
+npm run android
+npm start
+```
+
+`npm run android` builds/runs the native development client; `npm start` starts
+Expo in development-client mode. Camera and gallery use Android runtime
+permissions. Firebase email/password actions additionally require the relevant
+`EXPO_PUBLIC_FIREBASE_*` client configuration and an enabled provider in the
+Firebase project. Guest/local diagnosis does not require that configuration.
+See [development_setup.md](./docs/development_setup.md). No `.env.example`
+currently exists; do not commit `.env.local` or credentials.
+
+## Tests and builds
+
+```powershell
+# Project root
+npm test -- --runInBand
+npm run lint
+npx expo export --platform android
+
+# Android project directory
+cd android
+.\gradlew.bat assembleDebug
+```
+
+The test suite covers database behavior and migrations, disease metadata and
+assets, inference contract, image persistence, result/history image behavior,
+authentication, theme persistence, and screen interactions. See
+[testing.md](./docs/testing.md) for the most recently run results and known
+coverage gaps.
+
+## Repository map
+
+```text
+App.js                         app providers, readiness, splash and status bar
+src/screens/                   Welcome, Capture, Diagnosis, Result, History,
+                               Settings and Auth
+src/navigation/AppNavigator.js root stack, screen stacks and tab navigation
+src/services/                  SQLite, authentication, inference, image storage
+src/context/                   auth and appearance state
+src/constants/                 colors, typography and 22-class catalog/image map
+src/components/                shared visual components
+assets/models/plantcare/       bundled ONNX model and model metadata
+assets/diseases/               bundled disease-reference photographs
+__tests__/                     Jest tests
+docs/                          technical/project documentation
+android/                       generated/native Android project and Gradle wrapper
+```
+
+The broader details are indexed in [project_structure.md](./docs/project_structure.md).
+
+## Limitations and future work
+
+This is a 22-class image classifier, not a substitute for laboratory diagnosis
+or extension-service advice. Performance varies by class; the checked-in
+training report shows materially weaker Cassava test-split performance than
+the other crops. Image quality, lighting, angle, background, symptoms outside
+the leaf, and field/domain differences can affect predictions. Firebase login
+requires network access for credential operations; local inference/catalog/
+history do not require Firebase. Scan sync is not functional. See
+[limitations.md](./docs/limitations.md) and
+[future_scope.md](./docs/future_scope.md).
+
+## Documentation
+
+- [Application functionality](./docs/application_functionality.md)
+- [System architecture and data-flow diagrams](./docs/system_architecture.md)
+- [Technical report](./docs/PLANTCARE_LITE_TECHNICAL_REPORT.md)
+- [Feature matrix](./docs/feature_matrix.md)
+- [Machine learning](./docs/machine_learning.md)
+- [Disease catalog](./docs/disease_catalog.md)
+- [Database](./docs/database.md)
+- [Authentication](./docs/authentication.md)
+- [Offline architecture](./docs/offline_architecture.md)
+- [Screen guide](./docs/ui_screens.md)
+- [Assets and image handling](./docs/assets_and_images.md)
+- [Image sources and attributions](./docs/disease_image_sources.md)
+- [Testing](./docs/testing.md)
+- [Development setup](./docs/development_setup.md)
+- [Limitations](./docs/limitations.md)
+- [Future scope](./docs/future_scope.md)
+
+## License and attribution
+
+No project-level license file is present, so this README does not assert a
+license for the application as a whole. Image-level provenance and any
+attribution requirements are documented separately. Dataset-level licenses
+must not be assumed to apply to the project-owner-supplied photographs.
+
+## Project status
+
+The implemented Android-first application includes the local scan-to-result
+flow, 22-class model/catalog, local history, optional Firebase Authentication,
+and persistent Light/Dark appearance. Cloud synchronization, expert review,
+and further on-device/field evaluation remain unimplemented or future work.

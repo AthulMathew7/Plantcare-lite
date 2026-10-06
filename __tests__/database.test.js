@@ -28,9 +28,8 @@ describe('database service unit tests', () => {
   });
 
   it('initializes tables, sets PRAGMA foreign_keys, and seeds database atomically', async () => {
-    // Mock getFirstAsync for user and disease checks (unseeded state)
+    // Mock the default user check for an unseeded database
     let userChecked = false;
-    let diseaseChecked = false;
 
     const mockDatabase = {
       execAsync: jest.fn().mockResolvedValue(undefined),
@@ -38,10 +37,6 @@ describe('database service unit tests', () => {
       getFirstAsync: jest.fn().mockImplementation((query) => {
         if (query.includes('users WHERE id = 1')) {
           userChecked = true;
-          return Promise.resolve({ cnt: 0 });
-        }
-        if (query.includes('disease_info')) {
-          diseaseChecked = true;
           return Promise.resolve({ cnt: 0 });
         }
         return Promise.resolve(null);
@@ -61,7 +56,6 @@ describe('database service unit tests', () => {
     expect(mockDatabase.execAsync).toHaveBeenCalledWith('PRAGMA foreign_keys = ON;');
     expect(mockDatabase.withTransactionAsync).toHaveBeenCalled();
     expect(userChecked).toBe(true);
-    expect(diseaseChecked).toBe(true);
 
     // Verify user seeding insert call
     expect(mockDatabase.runAsync).toHaveBeenCalledWith(
@@ -71,12 +65,25 @@ describe('database service unit tests', () => {
     // Verify disease info seeding called for all seed rows
     for (const info of diseaseInfo) {
       expect(mockDatabase.runAsync).toHaveBeenCalledWith(
-        expect.stringContaining('INSERT OR REPLACE INTO disease_info'),
-        [info.class_name, info.display_name, info.description, info.treatment, info.severity],
+        expect.stringContaining('INSERT INTO disease_info'),
+        [
+          info.class_name,
+          info.display_name,
+          info.crop,
+          info.image,
+          info.description,
+          info.short_description,
+          info.symptoms,
+          info.cause,
+          info.treatment,
+          info.prevention,
+          info.cure_status,
+          info.severity,
+        ],
       );
     }
     const diseaseSeedCalls = mockDatabase.runAsync.mock.calls.filter(([query]) =>
-      query.includes('INSERT OR REPLACE INTO disease_info'),
+      query.includes('INSERT INTO disease_info'),
     );
     expect(diseaseSeedCalls).toHaveLength(22);
     expect(diseaseSeedCalls.map(([, values]) => values[0])).toEqual(
@@ -84,7 +91,7 @@ describe('database service unit tests', () => {
     );
   });
 
-  it('does not re-seed if database is already fully seeded', async () => {
+  it('synchronizes updated catalog metadata when the database is already fully seeded', async () => {
     const mockDatabase = {
       execAsync: jest.fn().mockResolvedValue(undefined),
       runAsync: jest.fn().mockResolvedValue({ lastInsertRowId: 1, changes: 1 }),
@@ -104,15 +111,18 @@ describe('database service unit tests', () => {
     };
 
     // Force module reset to test fresh getDatabase initialization
-    jest.isolateModules(async () => {
+    await jest.isolateModulesAsync(async () => {
       const dbModule = require('../src/services/database');
       const sqliteModule = require('expo-sqlite');
       sqliteModule.openDatabaseAsync.mockResolvedValueOnce(mockDatabase);
 
       await dbModule.getDatabase();
 
-      // Should check counts but not run insert queries
-      expect(mockDatabase.runAsync).not.toHaveBeenCalled();
+      const diseaseSeedCalls = mockDatabase.runAsync.mock.calls.filter(([query]) =>
+        query.includes('INSERT INTO disease_info'),
+      );
+      expect(diseaseSeedCalls).toHaveLength(22);
+      expect(diseaseSeedCalls.every(([query]) => query.includes('ON CONFLICT(class_name) DO UPDATE'))).toBe(true);
     });
   });
 
@@ -137,7 +147,7 @@ describe('database service unit tests', () => {
       }),
     };
 
-    await jest.isolateModules(async () => {
+    await jest.isolateModulesAsync(async () => {
       const dbModule = require('../src/services/database');
       const sqliteModule = require('expo-sqlite');
       sqliteModule.openDatabaseAsync.mockResolvedValueOnce(mockDatabase);
@@ -150,28 +160,37 @@ describe('database service unit tests', () => {
     const mockDatabase = {
       execAsync: jest.fn().mockResolvedValue(undefined),
       runAsync: jest.fn().mockResolvedValue({ lastInsertRowId: 1, changes: 1 }),
-      getFirstAsync: jest.fn().mockResolvedValue({ cnt: 1 }),
+      getFirstAsync: jest.fn().mockImplementation((query) => (
+        query.includes('auth_provider_id')
+          ? Promise.resolve({ id: 42, display_name: 'Test User', email: 'test@example.com' })
+          : Promise.resolve({ cnt: 1 })
+      )),
       getAllAsync: jest.fn().mockResolvedValue([]),
       withTransactionAsync: jest.fn(async (cb) => {
         await cb();
       }),
     };
 
-    await jest.isolateModules(async () => {
+    await jest.isolateModulesAsync(async () => {
       const dbModule = require('../src/services/database');
       const sqliteModule = require('expo-sqlite');
       sqliteModule.openDatabaseAsync.mockResolvedValueOnce(mockDatabase);
 
+      await dbModule.linkLocalUserToAuthAccount({
+        uid: 'firebase-user-42',
+        email: 'test@example.com',
+        displayName: 'Test User',
+      });
       await dbModule.deleteHistoryItem(42);
       expect(mockDatabase.runAsync).toHaveBeenCalledWith(
-        "UPDATE scan_history SET deleted_at = datetime('now') WHERE id = ?",
-        42,
+        "UPDATE scan_history SET deleted_at = datetime('now') WHERE id = ? AND user_id = ?",
+        42, 42,
       );
 
       await dbModule.restoreHistoryItem(42);
       expect(mockDatabase.runAsync).toHaveBeenCalledWith(
-        'UPDATE scan_history SET deleted_at = NULL WHERE id = ?',
-        42,
+        'UPDATE scan_history SET deleted_at = NULL WHERE id = ? AND user_id = ?',
+        42, 42,
       );
     });
   });

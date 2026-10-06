@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@expo-google-fonts/plus-jakarta-sans": "^0.2.3",
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^6.5.20",
     "@react-navigation/native": "^6.1.17",
     "@react-navigation/native-stack": "^6.9.26",
@@ -26,6 +27,7 @@
     "expo-image-picker": "~57.0.20",
     "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.3",
+    "firebase": "^12.19.0",
     "jpeg-js": "^0.4.4",
     "lucide-react-native": "^1.52.0",
     "onnxruntime-node": "^1.30.0",
@@ -51,6 +53,9 @@
     "react-test-renderer": "19.2.3"
   },
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "setupFiles": [
+      "<rootDir>/jest.setup.js"
+    ]
   }
 }

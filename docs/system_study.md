@@ -1,51 +1,48 @@
-# System Study — Feasibility Analysis
+# System study — current implementation
 
-## 1. Technical feasibility
+This replaces the original proposal-era feasibility study. It describes the
+checked-in PlantCareLite application; it is not a deployment or field trial
+report.
 
-MobileNetV2 is lightweight enough for mobile inference, and TensorFlow Lite with
-quantization keeps the model under ~10 MB after conversion. React Native paired
-with a native TFLite bridge gives cross-platform reach from a single codebase.
-SQLite handles offline-first local storage reliably, without requiring a
-persistent network connection for core functionality.
+## Technical feasibility
 
-Key technical risks and mitigations:
+The repository implements an Expo/React Native application with a bundled
+MobileNetV3Large ONNX model executed by ONNX Runtime React Native. SQLite
+stores local catalog/profile/history data, and image files are persisted in
+app documents where available. A custom native build is required; Expo Go
+does not provide the ONNX native module.
 
-| Risk | Mitigation |
+The checked-in evaluation summary reports 85.89% overall test-split accuracy
+and 54.75% Cassava test-split accuracy across the stated 3,651-image test
+split. These are dataset test metrics, not real-world or device guarantees.
+Image quality, cropping, domain shift, and class-specific performance remain
+material limitations.
+
+## Operational feasibility
+
+The core model/catalog/history loop does not depend on an app backend and is
+available locally. Firebase email/password identity is optional and depends
+on client configuration and network service. A remote decorative Diagnosis
+banner may not be available offline. The scan-sync setting and queue are
+present, but a backend uploader/restore service is not implemented.
+
+## Economic and licensing considerations
+
+The repository uses packaged open-source software dependencies, but that
+does not establish a license for the whole project or every bundled asset.
+Image-by-image source and attribution status is documented in
+`disease_image_sources.md`. The four owner-supplied reference photos have no
+public license claimed. No project-level license should be inferred where
+none is present.
+
+## Current feasibility summary
+
+| Area | Current status |
 |---|---|
-| On-device inference too slow on low-end phones | Use quantized (int8/float16) TFLite model; benchmark inference time during training pipeline |
-| Model size too large for app bundle | Dynamic-range or int8 quantization; restrict initial scope to 2–3 crop types |
-| Camera/gallery permissions vary by OS version | Use React Native's standard permission libraries and test across Android versions |
-
-## 2. Economic feasibility
-
-The project uses free and open resources throughout:
-
-- **Dataset:** PlantVillage (open, freely available via Kaggle)
-- **Frameworks:** TensorFlow, React Native, SQLite — all open-source
-- **Training compute:** Google Colab (free tier is sufficient for a MobileNetV2
-  transfer-learning job at this scope)
-- **Optional cloud sync:** can run on free-tier hosting (e.g. Firebase free tier)
-
-No paid APIs or licenses are required for the core diagnostic functionality,
-keeping the project viable within a student budget.
-
-## 3. Operational feasibility
-
-The app is designed for low-connectivity environments common in rural farming
-areas — all core functionality (capture, diagnosis, history) works fully
-offline. The interaction model requires minimal input from the user: take or
-select a photo, and receive a result. Diagnoses are explained in plain
-language with actionable treatment steps rather than raw model output, so no
-technical or agricultural expertise is required to use the app effectively.
-
-Adoption risk is low because the app doesn't require behavior change beyond
-what a user already does (photographing a plant) — it simply adds a
-diagnostic step to that existing action.
-
-## Summary
-
-| Dimension | Verdict |
-|---|---|
-| Technical | Feasible — proven lightweight architecture (MobileNetV2 + TFLite) |
-| Economic | Feasible — entirely open-source/free-tier resources |
-| Operational | Feasible — low learning curve, works offline by design |
+| On-device inference | Implemented; requires native ONNX build |
+| Local persistence | Implemented with SQLite and app document image files |
+| Guest mode | Implemented |
+| Firebase login/signup | Implemented when configured and online |
+| Cloud synchronization | Not implemented |
+| Production field accuracy | Not established by repository tests/metrics |
+| Physical-device testing | Requires a connected supported device; not demonstrated here |

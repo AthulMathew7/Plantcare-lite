@@ -1,26 +1,23 @@
-# Initial User Stories
+# User stories and implementation status
 
-Written in standard "As a / I want / so that" form, prioritized for a first
-working build.
+These user stories began as a planning list. The table records whether the
+current checked-in application supports the requested outcome; a story is not
+proof that the capability exists.
 
-| ID | Priority | Story |
-|---|---|---|
-| US-1 | High | As a home gardener, I want to photograph a leaf and instantly know if it's diseased, so that I can act before it spreads. |
-| US-2 | High | As a small-scale farmer, I want the app to work without internet in the field, so that connectivity isn't a blocker at harvest time. |
-| US-3 | High | As a user, I want to see a confidence score with the diagnosis, so that I know how much to trust the result. |
-| US-4 | Medium | As a user, I want treatment suggestions with the diagnosis, so that I know what to do next, not just what's wrong. |
-| US-5 | Medium | As a returning user, I want to browse my past scans, so that I can track how a plant's health changes over time. |
-| US-6 | Medium | As a user with intermittent internet, I want my history to sync automatically when I'm back online, so that I don't lose data if I switch phones. |
-| US-7 | Low | As a cautious user, I want to flag an uncertain diagnosis, so that I can seek a second opinion or retake the photo. |
-| US-8 | Low | As a new user, I want a short onboarding walkthrough, so that I understand how to take a good diagnostic photo. |
+| ID | Priority | User story | Current status |
+|---|---|---|---|
+| US-1 | High | As a home gardener, I want to photograph a leaf and get a preliminary class result. | Implemented for the supported 22 classes; not an expert diagnosis. |
+| US-2 | High | As a small-scale farmer, I want core scanning/history to work without internet. | Local inference, catalog and history are implemented; Firebase auth and a decorative Diagnosis image have online dependencies. |
+| US-3 | High | As a user, I want to see the model confidence score. | Implemented; the score is not a guarantee of correctness. |
+| US-4 | Medium | As a user, I want management suggestions with a result. | Implemented through locally seeded catalog content; not a treatment prescription. |
+| US-5 | Medium | As a returning user, I want to browse prior scans. | Implemented in local profile-scoped SQLite History. |
+| US-6 | Medium | As a user, I want history to synchronize across devices. | Not implemented; sync preference/queue scaffolding only. |
+| US-7 | Low | As a cautious user, I want to mark a diagnosis uncertain. | Implemented as a user-set flag on the local scan record. |
+| US-8 | Low | As a new user, I want onboarding. | A Welcome/Get Started first-run flow is implemented; it is not a multi-step walkthrough. |
 
-## Prioritization rationale
+## Prioritization context
 
-- **High priority** stories (US-1 to US-3) form the minimum viable diagnostic
-  loop: capture → offline inference → confidence-scored result. These are
-  targeted for the earliest working build.
-- **Medium priority** stories (US-4 to US-6) round out the experience with
-  actionable guidance, history tracking, and sync — planned for the coding
-  phase following Review 1.
-- **Low priority** stories (US-7, US-8) are polish/trust features, planned for
-  later iterations once the core loop is stable.
+The original priorities reflect an early proposal and are retained only as
+historical context. Current feature state is maintained in
+[feature_matrix.md](./feature_matrix.md), and unsupported ideas are listed in
+[future_scope.md](./future_scope.md).

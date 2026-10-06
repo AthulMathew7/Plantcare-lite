@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,9 @@ import ResultScreen from '../screens/ResultScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import DiagnosisScreen from '../screens/DiagnosisScreen';
+import AuthScreen from '../screens/AuthScreen';
+import { useAuth } from '../context/AuthContext';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 import colors from '../constants/colors';
 import { font, softShadow } from '../constants/typography';
 
@@ -67,6 +70,8 @@ const TAB_CONFIG = [
 ];
 
 function CustomTabBar({ state, descriptors, navigation }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(baseStyles);
   const insets = useSafeAreaInsets();
 
   return (
@@ -105,7 +110,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
             >
               <Icon
                 size={22}
-                color={isFocused ? colors.forest : '#9CA3AF'}
+                color={isFocused ? colors.forest : colors.navInactive}
                 strokeWidth={isFocused ? 2.5 : 1.8}
               />
               <Text
@@ -135,9 +140,28 @@ export default function AppNavigator({ initialRoute }) {
   return (
     <RootStack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
       <RootStack.Screen name="Welcome" component={WelcomeScreen} />
-      <RootStack.Screen name="Main" component={TabNavigator} />
+      <RootStack.Screen name="Main" component={MainAppScreen} />
+      <RootStack.Screen
+        name="Auth"
+        component={AuthScreen}
+        options={{ presentation: 'modal' }}
+      />
     </RootStack.Navigator>
   );
+}
+
+function MainAppScreen({ navigation }) {
+  const { status } = useAuth();
+
+  useEffect(() => {
+    const navigationState = navigation.getState();
+    const currentRoute = navigationState.routes[navigationState.index];
+    if (status === 'linking' && currentRoute?.name !== 'Auth') {
+      navigation.navigate('Auth');
+    }
+  }, [navigation, status]);
+
+  return <TabNavigator />;
 }
 
 function TabNavigator() {
@@ -156,7 +180,7 @@ function TabNavigator() {
 
 // ─── Styles ────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   tabBarWrapper: {
     position: 'absolute',
     bottom: 0,

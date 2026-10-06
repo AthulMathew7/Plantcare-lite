@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Leaf } from 'lucide-react-native';
 import colors from '../constants/colors';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 import { font, fontSize } from '../constants/typography';
 
 /**
@@ -9,6 +10,8 @@ import { font, fontSize } from '../constants/typography';
  * Uses a Lucide Leaf icon instead of emoji, matching the reference's clean vector style.
  */
 export default function EmptyState({ message }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(baseStyles);
   return (
     <View style={styles.container}>
       <View style={styles.iconWrap}>
@@ -19,7 +22,7 @@ export default function EmptyState({ message }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',

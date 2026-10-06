@@ -30,14 +30,15 @@ const SEVERITY_CONFIG = {
   },
 };
 
-export default function SeverityBadge({ severity }) {
+export default function SeverityBadge({ severity, isDark = false, themeColors = colors }) {
   if (!severity) return null;
   const key = String(severity).toLowerCase();
-  const config = SEVERITY_CONFIG[key] || {
-    label: `Severity: ${severity}`,
-    backgroundColor: '#E5E7EB',
-    textColor: '#374151',
-    borderColor: '#D1D5DB',
+  const sourceConfig = SEVERITY_CONFIG[key];
+  const config = {
+    label: sourceConfig?.label || `Severity: ${severity}`,
+    backgroundColor: sourceConfig?.backgroundColor || (isDark ? themeColors.surfaceElevated : '#E5E7EB'),
+    textColor: sourceConfig?.textColor || (isDark ? themeColors.textPrimary : '#374151'),
+    borderColor: sourceConfig?.borderColor || (isDark ? themeColors.border : '#D1D5DB'),
   };
 
   return (

@@ -1,20 +1,19 @@
-# Module Identification & Ownership
+# Module boundaries
 
-Modules are split so each of the 3 team members owns a clear, mostly
-independent vertical, with testing and documentation shared across the team.
+This document describes current code boundaries. It does not assert current
+individual ownership, staffing, or delivery dates.
 
-| Module | Scope | Owner | Timeline |
-|---|---|---|---|
-| M1 — ML Pipeline | Dataset prep, MobileNetV2 training, evaluation, TFLite conversion & quantization | Athul | Stage 1 (current) |
-| M2 — Mobile App (UI + Inference) | React Native camera flow, on-device TFLite inference, results & history screens | Riya | Stage 2 |
-| M3 — Local Storage & Sync | SQLite schema, CRUD for diagnosis history, offline queue, backend sync API | Gowrinanda | Stage 3 |
-| M4 — Backend (optional cloud sync) | FastAPI/Flask REST endpoints, Firebase Auth, sync conflict handling | Gowrinanda | Stage 3 |
-| M5 — Testing & QA | Unit tests per module, integration testing of capture → inference → save flow | Shared (all 3) | Ongoing |
-| M6 — Documentation & Reporting | SRS, user stories, architecture diagrams, final report, presentation | Athul | Ongoing |
+| Module | Primary files | Responsibility |
+|---|---|---|
+| App startup and navigation | `App.js`, `src/navigation/` | Provider composition, readiness, routes, stacks and fixed tab bar |
+| Screens and components | `src/screens/`, `src/components/` | User workflows and shared UI |
+| Theme | `src/context/ThemeContext.js`, `src/constants/colors.js` | Explicit Light/Dark palette and persisted appearance preference |
+| Authentication/profile | `src/context/AuthContext.js`, `src/services/authService.js` | Firebase identity, local SQLite profile association, Guest state |
+| Local storage | `src/services/database.js`, `src/services/imageStorage.js` | SQLite schema/data and scan image files |
+| ML/inference | `src/services/inferenceService.js`, `assets/models/plantcare/model.onnx` | Image preprocessing, ONNX execution and fixed output map |
+| Catalog/assets | `src/constants/diseaseInfo.js`, `assets/diseases/` | Disease content and bundled reference photographs |
+| Testing/docs | `__tests__/`, `docs/` | Regression checks and technical documentation |
 
-## Notes
-
-- Athul leads ML + documentation, Riya owns the app experience,
-  Gowrinanda owns data/storage and backend sync.
-- M5 (Testing & QA) and M6 (Documentation) are shared responsibilities so
-  no single module becomes a bottleneck for the whole team's review readiness.
+The former version of this file listed proposed module owners, timelines,
+TFLite, and a planned backend. Those were planning notes and are not evidence
+of current ownership or implemented cloud synchronization.

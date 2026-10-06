@@ -1,9 +1,11 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import colors from '../constants/colors';
+import { useThemedStyles } from '../context/ThemeContext';
 import { font, fontSize } from '../constants/typography';
 
 export default function SecondaryButton({ title, onPress, disabled, style }) {
+  const styles = useThemedStyles(baseStyles);
   return (
     <TouchableOpacity
       style={[styles.button, disabled && styles.disabled, style]}
@@ -16,7 +18,7 @@ export default function SecondaryButton({ title, onPress, disabled, style }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   button: {
     backgroundColor: colors.cream,
     paddingVertical: 14,

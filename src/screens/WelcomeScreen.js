@@ -3,12 +3,15 @@ import { View, Text, StyleSheet, SafeAreaView, Dimensions } from 'react-native';
 import { Leaf } from 'lucide-react-native';
 import PrimaryButton from '../components/PrimaryButton';
 import { setOnboardingComplete } from '../services/database';
+import { useTheme, useThemedStyles } from '../context/ThemeContext';
 import colors from '../constants/colors';
 import { font, fontSize } from '../constants/typography';
 
 const { height } = Dimensions.get('window');
 
 export default function WelcomeScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(baseStyles);
   const [loading, setLoading] = useState(false);
 
   const handleGetStarted = async () => {
@@ -63,7 +66,7 @@ export default function WelcomeScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.forest,
