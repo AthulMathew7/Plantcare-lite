@@ -5,6 +5,10 @@ capabilities:
 
 - Improve Cassava model performance and evaluate on independently collected,
   geographically diverse field photographs.
+- Improve the preliminary leaf-validation model by expanding and diversifying
+  its non-leaf dataset, including real-world backgrounds, objects, hands,
+  plant pots, soil, documents, and screens. Focus on reducing false leaf
+  acceptance and conduct a larger independent real-world evaluation.
 - Add disease classes only alongside suitable verified data, re-training,
   output-order updates, catalog content, and tests.
 - Conduct real-device inference, camera, accessibility, and restart testing

@@ -2,6 +2,14 @@
 
 ## Model and image domain
 
+- The MobileNetV3Small leaf-validation model at
+  `assets/models/leaf/leaf_classifier.onnx` is a preliminary supporting layer,
+  not a guaranteed non-leaf detector. In a 100-image real-world evaluation
+  (50 leaf and 50 non-leaf images), 49/50 leaves were correctly accepted,
+  while only 25/50 non-leaf images were correctly rejected; 22/50 non-leaf
+  images were falsely accepted and 3/50 were uncertain. The observed
+  non-leaf false-accept rate was **44%**. Held-out test performance does not
+  establish real-world robustness.
 - The classifier covers only the fixed 22 classes in its training label map;
   it cannot identify unlisted conditions or confirm absence of disease.
 - The recorded test split reports overall accuracy around 85.89%, while

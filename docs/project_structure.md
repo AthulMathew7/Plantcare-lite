@@ -17,12 +17,13 @@ src/
   navigation/           root, tab, Capture and History navigation
   screens/              Welcome, Capture, Diagnosis, Result, History,
                         Settings and Auth
-  services/             SQLite, Firebase Auth, inference, image files,
-                        history focus subscription
+  services/             SQLite, Firebase Auth, leaf validation, disease
+                        inference, image files, history focus subscription
   utils/                relative date formatting
 assets/
   diseases/             local disease-reference JPEGs and supplied originals
-  models/plantcare/     ONNX runtime model and training/evaluation artifacts
+  models/leaf/          leaf_classifier.onnx validation model
+  models/plantcare/     disease model.onnx and training/evaluation artifacts
 __tests__/               Jest suites
 docs/                    project and technical documentation
 android/                 generated/native Android app and Gradle wrapper
@@ -37,14 +38,16 @@ uml/                     design, presentation, and diagram resources
 |---|---|
 | `App.js` | Loads fonts, wraps providers, waits for app/auth/theme readiness and chooses onboarding start route |
 | `src/navigation/AppNavigator.js` | Welcome/Main/Auth root stack, tab bar and nested Capture/History stacks |
-| `src/services/inferenceService.js` | Model loading, image preprocessing, ONNX execution, output validation and class mapping |
+| `src/services/leafValidationService.js` | Preliminary leaf validation before disease classification |
+| `src/services/inferenceService.js` | Existing disease-model loading, image preprocessing, ONNX execution, output validation and class mapping |
 | `src/services/database.js` | SQLite schema creation/migration/seeding, profile and history operations |
 | `src/services/authService.js` | Firebase Authentication client adapter |
 | `src/services/imageStorage.js` | Persistent scan file copy, thumbnail generation, file deletion helpers |
 | `src/constants/diseaseInfo.js` | Authoritative 22-class metadata and local reference-image mapping |
 | `src/context/AuthContext.js` | Firebase state to active local profile coordination |
 | `src/context/ThemeContext.js` | Light/Dark palette and AsyncStorage persistence |
-| `assets/models/plantcare/model.onnx` | Bundled production inference model |
+| `assets/models/leaf/leaf_classifier.onnx` | Bundled MobileNetV3Small leaf-validation model |
+| `assets/models/plantcare/model.onnx` | Bundled MobileNetV3Large 22-class disease-classification model |
 | `docs/` | Current implementation documentation |
 
 `assets/models/plantcare/` includes training/evaluation outputs as well as the

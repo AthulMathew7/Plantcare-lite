@@ -54,10 +54,12 @@ Diagnosis navigates to History; Diagnose now navigates to Capture.
 
 ## Result
 
-- **Purpose:** show a prediction or a previously stored scan.
+- **Purpose:** validate a new scan as a leaf before showing a disease
+  prediction, or display a previously stored scan.
 - **Content/actions:** actual scan image hero, class/crop, confidence,
   catalog severity and explanatory metadata, Share, flag uncertain, Save.
-- **States:** analyzing, diagnosis failure with retry/back, prediction,
+- **States:** validating, non-leaf rejection, uncertain/clearer-image prompt,
+  disease analysis, diagnosis failure with retry/back, prediction,
   saving/saved/retry-save, uncertainty flag.
 - **Navigation/data:** entered from Capture or History. History mode skips
   inference and hides save/flag bar; uses stored class/confidence and original

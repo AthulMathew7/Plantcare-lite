@@ -5,8 +5,9 @@ entire application is not fully offline.
 
 ## Available without a network
 
-- **Inference:** the ONNX model is bundled and executed by the native ONNX
-  Runtime module using the local image.
+- **Inference:** the bundled leaf-validation ONNX model runs first; only an
+  image classified as LEAF proceeds to the bundled 22-class disease model.
+  Both execute through the native ONNX Runtime module using the local image.
 - **Catalog:** 22 disease/healthy entries are seeded into SQLite from the
   bundled catalog definition.
 - **Reference photos:** 22 class images are included as bundled local assets.

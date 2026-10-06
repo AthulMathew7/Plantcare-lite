@@ -6,17 +6,24 @@ report.
 
 ## Technical feasibility
 
-The repository implements an Expo/React Native application with a bundled
-MobileNetV3Large ONNX model executed by ONNX Runtime React Native. SQLite
-stores local catalog/profile/history data, and image files are persisted in
-app documents where available. A custom native build is required; Expo Go
-does not provide the ONNX native module.
+The repository implements an Expo/React Native application with a preliminary
+MobileNetV3Small ONNX leaf-validation model followed by the existing
+MobileNetV3Large disease-classification model, both executed by ONNX Runtime
+React Native. SQLite stores local catalog/profile/history data, and image
+files are persisted in app documents where available. A custom native build
+is required; Expo Go does not provide the ONNX native module.
 
 The checked-in evaluation summary reports 85.89% overall test-split accuracy
 and 54.75% Cassava test-split accuracy across the stated 3,651-image test
 split. These are dataset test metrics, not real-world or device guarantees.
 Image quality, cropping, domain shift, and class-specific performance remain
 material limitations.
+
+In a separate 100-image real-world evaluation of the leaf-validation model,
+49/50 leaves were correctly accepted; among 50 non-leaf images, 25 were
+correctly rejected, 22 were falsely accepted, and 3 were uncertain (44%
+observed false-accept rate on non-leaf images). Held-out test performance
+does not establish real-world robustness.
 
 ## Operational feasibility
 
@@ -45,4 +52,4 @@ none is present.
 | Firebase login/signup | Implemented when configured and online |
 | Cloud synchronization | Not implemented |
 | Production field accuracy | Not established by repository tests/metrics |
-| Physical-device testing | Requires a connected supported device; not demonstrated here |
+| Physical-device validation | Leaf-model Android integration succeeded; broad device coverage and real-world model robustness are not established |

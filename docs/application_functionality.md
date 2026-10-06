@@ -40,18 +40,31 @@ or persistence errors are shown with alerts.
 
 ## 4. Preprocessing and inference
 
-`inferenceService.js` resolves `assets/models/plantcare/model.onnx`, uses
-ONNX Runtime React Native, center-crops/resizes to 224 × 224, converts JPEG
-pixels to RGB, and builds a float32 NHWC tensor with raw 0–255 values. The
-model output is checked for 22 values, finite non-negative probabilities,
-and a sum approximately equal to one. The maximum output index maps to the
-fixed class order; the returned confidence is the winning value rounded to
-four decimal places. See [machine_learning.md](./machine_learning.md).
+For a new scan, `ResultScreen` first calls `validateLeaf(imageUri)` from
+`leafValidationService.js`. The service loads
+`assets/models/leaf/leaf_classifier.onnx` with ONNX Runtime React Native,
+uses the existing `preprocessImage` helper to center-crop to square, resize to
+224 × 224, decode RGB, and build a float32 `[1, 224, 224, 3]` NHWC tensor
+containing raw 0–255 RGB values. Probability >= 0.60 is LEAF, <= 0.40 is
+NOT_LEAF, and a value between the thresholds is UNCERTAIN. A NOT_LEAF result
+shows a rejection message; UNCERTAIN asks the user for a clearer leaf image.
+Neither proceeds to disease inference.
 
-The inference service throws when the image cannot be processed, the native
-ONNX module/model cannot load, or output validation fails. Result displays a
-loading state, then a diagnosis or a failure message with retry/back actions.
-Inference itself is local and does not require internet.
+Only LEAF proceeds to the existing `inferenceService.js`, which resolves
+`assets/models/plantcare/model.onnx` and applies that model's unchanged
+preprocessing, tensor shape, class order, output handling, and inference
+logic. Its input is also 224 × 224 RGB raw 0–255 float32. The model output is
+checked for 22 values, finite non-negative probabilities, and a sum
+approximately equal to one. The maximum output index maps to the fixed class
+order; returned confidence is the winning value rounded to four decimal
+places. Leaf validation does not modify this disease classifier. See
+[machine_learning.md](./machine_learning.md).
+
+The validation and inference services throw when an image cannot be
+processed, the native ONNX module/model cannot load, or output validation
+fails. Result displays a loading state, then a diagnosis or a rejection,
+clearer-image, or failure message with retry/back actions. Both model stages
+run locally and do not require internet.
 
 ## 5. Result and disease information
 

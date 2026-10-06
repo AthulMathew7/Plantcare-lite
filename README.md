@@ -18,7 +18,11 @@ demonstration/testing use—not as a confirmed agricultural diagnosis.
 ## Current capabilities
 
 - Capture a photograph with the camera or choose one from the gallery.
-- Run a bundled MobileNetV3Large ONNX classifier on-device.
+- Check the image with a bundled MobileNetV3Small leaf-validation model before
+  running the disease classifier. Non-leaf images are rejected and uncertain
+  images prompt the user for a clearer photo.
+- For images accepted as leaves, run the existing bundled MobileNetV3Large
+  22-class ONNX classifier on-device.
 - Present the top class, model confidence, catalog severity, and disease
   information.
 - Browse/filter 22 disease and healthy-condition entries; expand one card at a
@@ -42,7 +46,8 @@ Expo / React Native screens
   ├── capture and diagnosis navigation
   ├── disease catalog and local reference assets
   └── result/history with user's persisted scan image
-       ├── inferenceService → ONNX Runtime React Native → bundled ONNX model
+       ├── leafValidationService → MobileNetV3Small ONNX leaf gate
+       │    └── LEAF → inferenceService → MobileNetV3Large disease model
        ├── database service → expo-sqlite → plantcare.db
        ├── imageStorage → app documents/scans/
        ├── AuthContext → Firebase Authentication + local SQLite user
@@ -56,15 +61,18 @@ catalog photograph does not replace it. See
 
 ## Machine-learning model
 
-The mobile app loads `assets/models/plantcare/model.onnx` with
-`onnxruntime-react-native`. Inference preprocessing center-crops an image to a
-square, resizes to 224 × 224, decodes RGB pixels, and supplies float32 raw RGB
-values in the range 0–255 in `[1, 224, 224, 3]` NHWC layout. The service
-validates 22 output values and their probability sum, chooses the maximum, and
-returns its class and rounded probability. Do not interpret the score as a
-field-validated probability of correctness. No production-device accuracy
-claim is made. Details and the exact output order are in
-[machine_learning.md](./docs/machine_learning.md).
+The first stage loads `assets/models/leaf/leaf_classifier.onnx` through
+`leafValidationService.js`. This MobileNetV3Small model returns a leaf
+probability: at least 0.60 continues to the disease model, at most 0.40
+rejects the image, and values between those thresholds request a clearer
+image. The disease stage then loads `assets/models/plantcare/model.onnx`
+through `inferenceService.js`, an unchanged MobileNetV3Large classifier for
+22 disease/healthy classes. Both use 224 × 224 × 3 raw RGB 0–255 float32
+inputs in `[1, 224, 224, 3]` NHWC layout. The leaf-validation feature does not
+modify the disease classifier's preprocessing, tensor shape, class order,
+output handling, or inference logic. See
+[machine_learning.md](./docs/machine_learning.md) for the detailed contracts
+and real-world evaluation limits.
 
 ## Data and identity
 
@@ -148,11 +156,12 @@ App.js                         app providers, readiness, splash and status bar
 src/screens/                   Welcome, Capture, Diagnosis, Result, History,
                                Settings and Auth
 src/navigation/AppNavigator.js root stack, screen stacks and tab navigation
-src/services/                  SQLite, authentication, inference, image storage
+src/services/                  SQLite, authentication, leaf validation, disease inference, image storage
 src/context/                   auth and appearance state
 src/constants/                 colors, typography and 22-class catalog/image map
 src/components/                shared visual components
-assets/models/plantcare/       bundled ONNX model and model metadata
+assets/models/leaf/            bundled leaf-validation ONNX model
+assets/models/plantcare/       bundled disease-classifier ONNX model and metadata
 assets/diseases/               bundled disease-reference photographs
 __tests__/                     Jest tests
 docs/                          technical/project documentation
@@ -166,10 +175,13 @@ The broader details are indexed in [project_structure.md](./docs/project_structu
 This is a 22-class image classifier, not a substitute for laboratory diagnosis
 or extension-service advice. Performance varies by class; the checked-in
 training report shows materially weaker Cassava test-split performance than
-the other crops. Image quality, lighting, angle, background, symptoms outside
-the leaf, and field/domain differences can affect predictions. Firebase login
-requires network access for credential operations; local inference/catalog/
-history do not require Firebase. Scan sync is not functional. See
+the other crops. The supporting leaf-validation model also has a measured
+real-world false-accept rate of 44% on the reported 50-image non-leaf sample;
+it is not a guaranteed non-leaf detector. Image quality, lighting, angle,
+background, symptoms outside the leaf, and field/domain differences can
+affect predictions. Firebase login requires network access for credential
+operations; local inference/catalog/history do not require Firebase. Scan
+sync is not functional. See
 [limitations.md](./docs/limitations.md) and
 [future_scope.md](./docs/future_scope.md).
 

@@ -2,9 +2,14 @@
 
 ## Verified model artifacts
 
-- Mobile architecture recorded by the model card: MobileNetV3Large
-  (`mobilenetv3large` backbone).
-- Mobile inference artifact: `assets/models/plantcare/model.onnx`.
+- **Leaf validation:** MobileNetV3Small; runtime artifact
+  `assets/models/leaf/leaf_classifier.onnx`; service
+  `src/services/leafValidationService.js`. It runs before the disease model
+  and returns a leaf probability for preliminary image gating.
+- **Disease classification:** MobileNetV3Large (`mobilenetv3large` backbone);
+  runtime artifact `assets/models/plantcare/model.onnx`; service
+  `src/services/inferenceService.js`. This is the existing 22-class
+  disease/healthy classifier.
 - Runtime: `onnxruntime-react-native`.
 - Runtime version in `package.json`: `^1.24.3`.
 - Model release identifier in the app: `plantcare-v1.0`.
@@ -12,13 +17,37 @@
 - The runtime loads a packaged Expo asset into a local URI and creates a
   cached `InferenceSession`.
 
-Training Keras/TFLite files and evaluation artifacts are also in the
-repository's model-data directory, but the app inference service specifically
-loads the ONNX artifact. It does not run the Keras or TFLite files.
+The mobile flow loads the leaf ONNX model first and loads the disease ONNX
+model only after a LEAF result. Training Keras/TFLite files and evaluation
+artifacts are also in the repository's model-data directory, but the app
+inference services load the ONNX artifacts. They do not run the Keras or
+TFLite files.
 
-## Input and preprocessing contract
+## Leaf validation contract
 
-`preprocessImage(imageUri)` performs the following steps:
+The leaf model uses the existing `preprocessImage(imageUri)` helper described
+below: center crop to square, resize to 224 × 224, JPEG decode to RGB, and raw
+0–255 channel values in a float32 `[1, 224, 224, 3]` NHWC tensor. On the
+physical Android integration run, its ONNX session loaded with input
+`input` and output `leaf_prob`.
+
+`leafValidationService.js` reads the first output value as the leaf
+probability and applies these thresholds:
+
+| Leaf probability | Status | Application behavior |
+|---:|---|---|
+| >= 0.60 | LEAF | Continue to the existing disease classifier |
+| <= 0.40 | NOT_LEAF | Reject and ask the user to choose/capture a leaf |
+| > 0.40 and < 0.60 | UNCERTAIN | Ask the user for a clearer leaf image |
+
+This is a preliminary supporting validation layer, not a guaranteed
+non-leaf detector. Its measured real-world limitations are recorded in
+[limitations.md](./limitations.md) and [testing.md](./testing.md).
+
+## Disease-classifier input and preprocessing contract
+
+The existing disease classifier continues to use `preprocessImage(imageUri)`,
+which performs the following steps:
 
 1. Reads source dimensions through Expo ImageManipulator.
 2. Center-crops the shorter image dimension to make a square.
@@ -79,13 +108,17 @@ output indices.
 
 ## Prediction flow and failures
 
-`runInference` resolves the native runtime, loads/caches the model session,
-preprocesses the URI, executes the first model input/output, validates the
-output, selects the maximum class, splits its key into crop and condition,
-and returns class, confidence, crop, condition, and model version. Missing
-native ONNX support, missing model path, image decode/preprocess errors,
-missing output, invalid probabilities, or wrong output count throw errors.
-Result shows a failure state and retry option.
+For new scans, `validateLeaf` runs first. NOT_LEAF and UNCERTAIN stop the flow
+with the corresponding user prompt. On LEAF, `runInference` resolves the
+native runtime, loads/caches the disease-model session, preprocesses the URI,
+executes the first model input/output, validates the output, selects the
+maximum class, splits its key into crop and condition, and returns class,
+confidence, crop, condition, and model version. This validation stage does
+not modify the disease classifier's preprocessing, tensor shape, class order,
+output handling, or inference logic. Missing native ONNX support, missing
+model path, image decode/preprocess errors, missing output, invalid
+probabilities, or wrong output count throw errors. Result shows an appropriate
+validation prompt or an inference failure state with retry.
 
 ## Training/test evidence and interpretation
 
@@ -111,6 +144,7 @@ uncertainty is a separate manual History flag.
 
 ## Offline execution
 
-The model and runtime are packaged with the custom native app; inference uses
-the local image and bundled model without a network call. Expo Go lacks the
-required native ONNX module, so use a development/production native build.
+Both models and the runtime are packaged with the custom native app; leaf
+validation and subsequent disease inference use the local image and bundled
+models without a network call. Expo Go lacks the required native ONNX module,
+so use a development/production native build.

@@ -9,9 +9,13 @@ flowchart TD
   Nav --> Screens[Welcome, Capture, Diagnosis, Result, History, Settings, Auth]
   Screens --> Contexts[AuthContext and ThemeContext]
   Screens --> Services[Application services]
-  Services --> Inference[inferenceService]
-  Inference --> Prep[Image manipulation and RGB decoder]
-  Inference --> ORT[ONNX Runtime React Native]
+  Services --> LeafValidation[leafValidationService]
+  LeafValidation --> Prep[Shared image manipulation and RGB decoder]
+  LeafValidation --> ORT[ONNX Runtime React Native]
+  LeafValidation -->|LEAF| Inference[inferenceService]
+  Inference --> Prep
+  Inference --> ORT
+  ORT --> LeafModel[Bundled assets/models/leaf/leaf_classifier.onnx]
   ORT --> Model[Bundled assets/models/plantcare/model.onnx]
   Services --> DB[database service / expo-sqlite]
   DB --> SQLite[(plantcare.db)]
@@ -37,12 +41,16 @@ flowchart TD
   user-profile resolution. `ThemeContext` owns the explicit Light/Dark
   preference and palette.
 - **Services:** `database.js` owns SQLite creation, migrations, seeding,
-  profiles, scans, and settings. `inferenceService.js` handles model loading,
+  profiles, scans, and settings. `leafValidationService.js` runs first and
+  returns LEAF, NOT_LEAF, or UNCERTAIN. Only LEAF proceeds to
+  `inferenceService.js`, which retains the existing disease-model loading,
   image tensor creation, inference, and class output. `imageStorage.js` copies
   images, creates thumbnails, and deletes individual image files. `authService.js`
   wraps Firebase Authentication. `historyNavigation.js` listens for History
   focus refreshes.
-- **ML/data:** the ONNX model is bundled under `assets/models/plantcare/`.
+- **ML/data:** the leaf-validation ONNX model is bundled at
+  `assets/models/leaf/leaf_classifier.onnx`; the unchanged 22-class disease
+  ONNX model is bundled at `assets/models/plantcare/model.onnx`.
   `diseaseInfo.js` is the authoritative application metadata and local image
   map; SQLite is seeded/upserted from it. Reference photos live in
   `assets/diseases/`.
@@ -60,7 +68,8 @@ sequenceDiagram
   participant Capture as CaptureScreen
   participant Files as imageStorage
   participant Result as ResultScreen
-  participant ML as inferenceService / ONNX
+  participant Gate as leafValidationService / leaf ONNX
+  participant ML as inferenceService / disease ONNX
   participant DB as database.js / SQLite
   participant History as HistoryScreen
 
@@ -68,12 +77,20 @@ sequenceDiagram
   Capture->>Files: persistScanImage(source URI)
   Files-->>Capture: app-documents URI
   Capture->>Result: navigate with actual imageUri
-  Result->>ML: runInference(imageUri)
-  ML-->>Result: class, confidence, crop, condition
-  Result->>DB: lookupDiseaseInfo(class)
-  Result->>DB: automatically save successful scan
-  DB->>Files: persist source and generate thumbnail
-  DB-->>Result: scan record ID / save outcome
+  Result->>Gate: validateLeaf(imageUri)
+  alt NOT_LEAF
+    Gate-->>Result: reject image and request a leaf photo
+  else UNCERTAIN
+    Gate-->>Result: request a clearer leaf image
+  else LEAF
+    Gate-->>Result: accepted leaf
+    Result->>ML: runInference(imageUri)
+    ML-->>Result: 22-class prediction and confidence
+    Result->>DB: lookupDiseaseInfo(class)
+    Result->>DB: automatically save successful scan
+    DB->>Files: persist source and generate thumbnail
+    DB-->>Result: scan record ID / save outcome
+  end
   User->>History: open history
   History->>DB: load rows for active local user
   DB-->>History: scan paths and catalog display name
@@ -85,6 +102,13 @@ sequenceDiagram
 
 Result's hero and History images originate from the scan record/URI. Catalog
 reference photos are used for Diagnosis cards and are not substituted.
+
+The leaf gate runs before disease inference and uses the existing shared image
+preprocessing helper. It classifies probability >= 0.60 as LEAF, <= 0.40 as
+NOT_LEAF, and intermediate values as UNCERTAIN. It is a preliminary
+validation layer, not a guaranteed non-leaf detector. The gate does not alter
+the disease model or its preprocessing, input tensor shape, output class
+order, output handling, or inference logic.
 
 ## Authentication/local-profile flow
 

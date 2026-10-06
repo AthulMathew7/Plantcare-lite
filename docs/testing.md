@@ -19,8 +19,9 @@ AsyncStorage. Test files currently cover:
 | Other component/utilities | `SeverityBadge.test.js`, `colors.test.js`, `dateUtils.test.js` | Severity labels, palette tokens and date formatting |
 
 These are automated tests, including mocked/native-boundary tests. They do not
-replace Android-device validation, real Firebase project validation, or
-agricultural field evaluation.
+replace real Firebase project validation or agricultural field evaluation.
+The leaf-model Android integration evidence below is a separate physical
+device test, not an automated Jest test.
 
 ## Latest validation run
 
@@ -30,8 +31,9 @@ Run in project root:
 npm test -- --runInBand
 ```
 
-**16 suites and 65 tests passed** in the latest validated run for this
-documentation update. Tests were rerun after the docs were written.
+The recorded successful application validation completed **16 suites and 65
+tests**. This documentation-only update did not modify application code or
+rerun the application test suite.
 
 Android export:
 
@@ -50,16 +52,30 @@ Debug APK:
 
 **Passed**; Gradle reported `BUILD SUCCESSFUL` and generated the debug APK.
 
+The existing successful validation results also include authentication,
+SQLite history, disease inference, dark mode, Android build/export, and
+validation of the disease model's 22-class output contract.
+
 ESLint is available as `npm run lint`. The most recently checked result exited
 successfully with zero errors and 174 warnings. Lint is not one of Jest's
 test suites.
 
 ## Physical-device validation
 
-**Pending/not verified by this repository run.** No connected-device test
-evidence is checked in. The current environment did not have `adb` available,
-so camera/gallery permissions, theme behavior after a physical restart, and
-on-device model latency were not manually checked as part of this task.
+**Leaf-model Android integration: successful.** On a physical Android device:
+
+- The leaf ONNX model loaded successfully; the ONNX session input was
+  `input` and output was `leaf_prob`.
+- Leaf validation executed before disease inference.
+- When the leaf model returned LEAF, the existing disease model subsequently
+  executed successfully.
+- Disease inference continued to produce the existing 22-class output, and
+  history saving continued to work.
+
+This confirms integration and inference sequencing, not strong real-world
+leaf detection. Broader physical-device checks such as camera/gallery
+permissions, restart behavior, and performance across devices are not
+established by this integration result.
 
 ## Gaps
 
@@ -70,4 +86,16 @@ on-device model latency were not manually checked as part of this task.
   Firebase project and network.
 - No automated test proves the absent synchronization worker; no such worker
   is implemented.
-- No field study or expert-label validation is represented by the test suite.
+- The real-world leaf-model evaluation below is limited to 100 images and is
+  not a large independent field study or expert-label validation.
+
+## Leaf-model real-world evaluation
+
+In the reported 100-image real-world evaluation, there were 50 leaf images
+and 50 non-leaf images. The model correctly accepted 49/50 leaf images.
+Among the 50 non-leaf images, it correctly rejected 25, falsely accepted
+22, and classified 3 as uncertain. The observed false-accept rate on
+non-leaf images was therefore **44% (22/50)**. This result does not support
+describing the model as a guaranteed non-leaf detector or as having perfect
+real-world accuracy. The model performed well on its held-out test set, but
+that result is not evidence of real-world robustness.

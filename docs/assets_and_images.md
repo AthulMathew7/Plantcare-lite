@@ -1,12 +1,13 @@
 # Model, reference photographs, and scan images
 
-## Bundled model
+## Bundled models
 
-The mobile inference model is `assets/models/plantcare/model.onnx`, loaded as
-an Expo asset by `src/services/inferenceService.js`. It is the app's model
-input, not a disease photo. Model metadata/artifacts are alongside it;
-`machine_learning.md` distinguishes the runtime ONNX file from training and
-TFLite artifacts.
+The preliminary leaf-validation model is
+`assets/models/leaf/leaf_classifier.onnx`, loaded by
+`src/services/leafValidationService.js`. After LEAF is returned, the disease
+model at `assets/models/plantcare/model.onnx` is loaded by
+`src/services/inferenceService.js`. Both are model inputs, not disease
+photographs. See `machine_learning.md` for their distinct roles and contracts.
 
 ## Disease reference photographs
 
@@ -35,7 +36,7 @@ database stores the persisted full-image URI and attempts to save a generated
 | Image purpose | Source and path | Used by |
 |---|---|---|
 | Disease reference | Bundled `assets/diseases/*.jpg`, selected through `diseaseInfo.js` | Diagnosis cards/reference information |
-| User scan original | Camera/gallery image copied to app documents; `scan_history.image_path` | Inference input, Result hero, History detail |
+| User scan original | Camera/gallery image copied to app documents; `scan_history.image_path` | Leaf validation input; if accepted, disease inference input; Result hero, History detail |
 | User scan thumbnail | Best-effort generated thumbnail; `scan_history.image_thumbnail_path` | History list thumbnail; original used as fallback |
 
 **A disease reference photo is not a user's scan.** Result's hero displays the

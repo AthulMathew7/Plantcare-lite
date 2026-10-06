@@ -3,11 +3,13 @@
 ## 1. Executive summary
 
 PlantCareLite is an Android-first Expo/React Native app for offline-capable
-classification of leaf images into a fixed 22-class, five-crop set. It runs a
-bundled MobileNetV3Large ONNX model locally, presents catalog-backed
-information, and stores scan history and photographs on the device. Firebase
-Authentication is optional and is used for email/password identity only;
-there is no implemented cloud history synchronization.
+classification of accepted leaf images into a fixed 22-class, five-crop set.
+A bundled MobileNetV3Small ONNX model first provides preliminary leaf
+validation; only LEAF proceeds to the existing MobileNetV3Large disease
+classifier. The app presents catalog-backed information and stores scan
+history and photographs on the device. Firebase Authentication is optional
+and is used for email/password identity only; there is no implemented cloud
+history synchronization.
 
 ## 2. Project overview
 
@@ -35,11 +37,12 @@ confirm disease or replace expert assessment.
 
 ## 5. Scope
 
-The implemented classifier covers 22 ordered classes in Cassava, Coconut,
-Jackfruit, Mango, and Rice. The app includes onboarding, Capture, Diagnosis,
-Result, History, Settings, Guest mode, and Firebase email/password auth.
-There is no cloud scan backup/sync, remote diagnostic API, expert consultation,
-or model-based severity classifier.
+The disease classifier covers 22 ordered classes in Cassava, Coconut,
+Jackfruit, Mango, and Rice, and a preliminary leaf-validation stage runs
+before it. The app includes onboarding, Capture, Diagnosis, Result, History,
+Settings, Guest mode, and Firebase email/password auth. There is no cloud scan
+backup/sync, remote diagnostic API, expert consultation, or model-based
+severity classifier.
 
 ## 6. Target users
 
@@ -51,8 +54,10 @@ treatment or pesticide decisions.
 
 Implemented functions include onboarding, guest profile activation, optional
 Firebase email/password login/signup/logout, image capture/library selection,
-on-device prediction, local disease information, automatic scan saving,
+leaf validation followed by on-device disease prediction for accepted leaves,
+local disease information, automatic successful-diagnosis saving,
 History/soft-delete/undo, manual uncertainty flagging, and theme preference.
+Non-leaf images are rejected and uncertain images prompt for a clearer image.
 Sync preference and queue storage exist but transfer is not implemented.
 See [feature_matrix.md](./feature_matrix.md) for status by feature.
 
@@ -84,8 +89,10 @@ The UI/navigation, application services, persistence, and bundled asset
 layers are described in [system_architecture.md](./system_architecture.md).
 The main data boundaries are:
 
-- Screens invoke inference, database, image-storage, auth, and theme services.
-- Inference consumes the user's image and bundled ONNX model.
+- New scans pass through the leaf-validation service first. Only a LEAF result
+  invokes the existing disease inference service and disease ONNX model.
+- Successful disease predictions invoke database and image-storage services;
+  rejected or uncertain scans do not produce a disease result.
 - SQLite owns user profiles, scan rows, catalog metadata, onboarding and sync
   preference/queue.
 - App documents contain user's scan images and thumbnails.
@@ -98,9 +105,12 @@ The main data boundaries are:
 At startup, the app loads fonts, database/onboarding state, auth readiness, and
 theme preference. Welcome appears on first use. Main's Capture flow copies a
 camera/gallery image where possible and passes its URI to Result. Result runs
-inference, reads disease metadata, and automatically saves successful
-predictions. History reads records for the active local profile and opens a
-history-mode Result with stored class/confidence and original image URI.
+leaf validation first: NOT_LEAF displays a rejection, UNCERTAIN asks for a
+clearer image, and LEAF proceeds to the existing 22-class disease classifier.
+A successful diagnosis is displayed, enriched with disease metadata, and
+automatically saved. History reads records for the active local profile and
+opens a history-mode Result with stored class/confidence and original image
+URI.
 
 ## 12. UI architecture
 
@@ -160,26 +170,38 @@ and documented summaries are in [disease_catalog.md](./disease_catalog.md).
 
 ## 19. ML model
 
-The mobile runtime model is `assets/models/plantcare/model.onnx`, described
-as MobileNetV3Large. It is loaded with ONNX Runtime React Native. Training,
-evaluation and TFLite artifacts in the repository are not loaded by the
-mobile app. Model details/limitations: [machine_learning.md](./machine_learning.md).
+The first-stage leaf-validation model is
+`assets/models/leaf/leaf_classifier.onnx` (MobileNetV3Small), loaded by
+`src/services/leafValidationService.js`. It returns a leaf probability:
+>= 0.60 is LEAF, <= 0.40 is NOT_LEAF, and the intermediate range is
+UNCERTAIN. Only LEAF proceeds to the existing
+`assets/models/plantcare/model.onnx` MobileNetV3Large disease classifier,
+loaded by `src/services/inferenceService.js`. The disease model's
+preprocessing, input tensor shape, 22-class order, output handling, and
+inference logic remain unchanged; leaf validation does not modify the
+classifier. Training, evaluation and TFLite artifacts in the repository are
+not loaded by the mobile app. Model details/limitations:
+[machine_learning.md](./machine_learning.md).
 
 ## 20. Inference pipeline
 
-The service center-crops to square, resizes to 224 × 224, decodes RGB, builds
-float32 raw 0–255 NHWC input `[1, 224, 224, 3]`, executes the ONNX session,
-checks output count/probabilities, maps the winning index to one of 22 class
-keys, and rounds the maximum output to four decimals for `confidence`.
-Inference is local. Do not change the preprocessor or order independently of
-the model.
+Both stages use the shared preprocessing helper: center-crop to square,
+resize to 224 × 224, decode RGB, and build a float32 raw 0–255 NHWC input
+`[1, 224, 224, 3]`. The leaf model runs first and gates the disease model
+using the thresholds above. For LEAF, the unchanged disease service executes
+its ONNX session, checks the 22 output values/probabilities, maps the winning
+index using the existing class order, and rounds the maximum output to four
+decimals for `confidence`. Both stages are local. Leaf validation does not
+change the disease preprocessor, tensor shape, output/class order, output
+handling, or inference logic.
 
 ## 21. Image processing
 
 `expo-image-manipulator` probes dimensions and crops/resizes the scan;
-`jpeg-js` decodes RGB. The actual scan URI is the inference input. The
-independent image-storage service copies source files to app documents and
-creates best-effort thumbnails.
+`jpeg-js` decodes RGB. The actual scan URI is the leaf-validation input and,
+if accepted, the disease-inference input. The independent image-storage
+service copies source files to app documents and creates best-effort
+thumbnails.
 
 ## 22. Result generation
 
@@ -244,12 +266,18 @@ before relying on error UX.
 
 ## 30. Testing
 
-Jest/jest-expo tests cover catalog/assets, Diagnosis interactions, inference,
-SQLite/migrations, file persistence, auto-save and actual scan images,
-History, auth/local profile behavior, theme restore/persistence, and utility
-components. The current documented validation is 16 suites/65 tests, Expo
-Android export passed, and Gradle debug build passed. Physical-device
-verification remains pending. See [testing.md](./testing.md).
+Jest/jest-expo tests cover catalog/assets, Diagnosis interactions, disease
+inference, SQLite/migrations, file persistence, auto-save and actual scan
+images, History, auth/local profile behavior, theme restore/persistence, and
+utility components. The current documented validation is 16 suites/65 tests;
+Expo Android export and Gradle debug build passed. Authentication, SQLite
+history, disease inference, dark mode, and the 22-class model output contract
+have successful validation results. A physical Android integration test also
+confirmed that the leaf ONNX session loads with input `input` and output
+`leaf_prob`, executes before disease inference, and allows successful
+22-class inference and history saving when it returns LEAF. This integration
+does not establish real-world leaf-detection robustness. See
+[testing.md](./testing.md).
 
 ## 31. Build process
 
@@ -268,33 +296,45 @@ database are not cloud-backed by this implementation.
 
 ## 33. Limitations
 
-The classifier is bounded by its 22 classes and image training domain.
-Confidence is not calibrated field certainty; Cassava test-split performance
-is comparatively low. Photo framing/quality and visual similarity matter.
-There is no cloud sync or field-expert validation in this report. Full list:
-[limitations.md](./limitations.md).
+The disease classifier is bounded by its 22 classes and image training
+domain. Confidence is not calibrated field certainty; Cassava test-split
+performance is comparatively low. The supporting leaf-validation model is
+not a guaranteed non-leaf detector: in a 100-image real-world evaluation
+(50 leaf and 50 non-leaf images), 49/50 leaves were correctly accepted,
+25/50 non-leaf images were correctly rejected, 22/50 non-leaf images were
+falsely accepted, and 3/50 were uncertain. Its observed real-world
+non-leaf false-accept rate was 44%. Strong held-out test performance does not
+establish real-world robustness. Photo framing/quality and visual similarity
+matter. There is no cloud sync or field-expert validation in this report.
+Full list: [limitations.md](./limitations.md).
 
 ## 34. Future scope
 
 Potential future work includes stronger external/field evaluation, improving
-Cassava performance, more reviewed disease classes/guidance, translations,
-device validation, and a deliberately designed secure sync service. These are
-not implemented features. See [future_scope.md](./future_scope.md).
+Cassava performance and leaf-validation robustness by diversifying non-leaf
+data, more reviewed disease classes/guidance, translations, device
+validation, and a deliberately designed secure sync service. These are not
+implemented features. See [future_scope.md](./future_scope.md).
 
 ## 35. Current project status
 
-The repository contains an implemented local scan/classification/history
-application with optional Firebase Auth and persistent Dark Mode. The
-runtime ONNX model and local class catalog are packaged. No project-level
-license file was found in the audited root, and the app's sync UI remains
-nonfunctional scaffolding. Automated checks pass as recorded in
-[testing.md](./testing.md); physical-device checks are pending.
+The repository contains an implemented local scan/leaf-validation/
+classification/history application with optional Firebase Auth and persistent
+Dark Mode. Both runtime ONNX models and the local class catalog are packaged.
+No project-level license file was found in the audited root, and the app's
+sync UI remains nonfunctional scaffolding. Automated checks and the
+leaf-model Android integration are recorded in [testing.md](./testing.md);
+broader physical-device coverage and real-world leaf-model robustness are not
+established.
 
 ## 36. Conclusion
 
-PlantCareLite currently delivers an offline-capable local classification and
-history workflow with optional online identity. Documentation must preserve
-the key boundaries: catalog reference photographs versus actual user scans,
-Firebase authentication versus local SQLite application data, and stored
-sync queue entries versus working synchronization. The model is an
-informational classifier and should not be treated as expert diagnosis.
+PlantCareLite currently delivers an offline-capable local leaf-validation,
+disease-classification, and history workflow with optional online identity.
+The leaf model is a preliminary support layer, not a guaranteed detector;
+the unchanged 22-class disease model runs only after a LEAF result.
+Documentation must preserve the key boundaries: catalog reference
+photographs versus actual user scans, Firebase authentication versus local
+SQLite application data, and stored sync queue entries versus working
+synchronization. Model results are informational and should not be treated as
+expert diagnosis.

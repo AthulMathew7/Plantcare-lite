@@ -10,7 +10,8 @@ individual ownership, staffing, or delivery dates.
 | Theme | `src/context/ThemeContext.js`, `src/constants/colors.js` | Explicit Light/Dark palette and persisted appearance preference |
 | Authentication/profile | `src/context/AuthContext.js`, `src/services/authService.js` | Firebase identity, local SQLite profile association, Guest state |
 | Local storage | `src/services/database.js`, `src/services/imageStorage.js` | SQLite schema/data and scan image files |
-| ML/inference | `src/services/inferenceService.js`, `assets/models/plantcare/model.onnx` | Image preprocessing, ONNX execution and fixed output map |
+| ML/leaf validation | `src/services/leafValidationService.js`, `assets/models/leaf/leaf_classifier.onnx` | Preliminary leaf probability gate before disease classification |
+| ML/disease inference | `src/services/inferenceService.js`, `assets/models/plantcare/model.onnx` | Existing image preprocessing, ONNX execution and fixed 22-class output map |
 | Catalog/assets | `src/constants/diseaseInfo.js`, `assets/diseases/` | Disease content and bundled reference photographs |
 | Testing/docs | `__tests__/`, `docs/` | Regression checks and technical documentation |
 
