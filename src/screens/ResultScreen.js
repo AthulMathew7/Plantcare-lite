@@ -23,6 +23,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import ConfidenceBadge from '../components/ConfidenceBadge';
 import SeverityBadge from '../components/SeverityBadge';
 import { runInference, MODEL_VERSION } from '../services/inferenceService';
+import { validateLeaf } from '../services/leafValidationService';
 import { useTheme, useThemedStyles } from '../context/ThemeContext';
 import {
   lookupDiseaseInfo,
@@ -115,7 +116,34 @@ export default function ResultScreen({ route, navigation }) {
       setError(null);
       try {
         console.log('[PlantCare][Scan] IMAGE URI:', imageUri);
-        const result = await runInference(imageUri);
+        const leafResult = await validateLeaf(imageUri);
+
+if (cancelled) return;
+
+console.log('[PlantCare][LeafGate] RESULT:', {
+  status: leafResult.status,
+  probability: leafResult.probability,
+});
+
+if (leafResult.status === 'NOT_LEAF') {
+  setInferenceResult(null);
+  setDiseaseInfo(null);
+  setError(
+    'The selected image does not appear to contain a leaf. Please select or capture a clear leaf image.'
+  );
+  return;
+}
+
+if (leafResult.status === 'UNCERTAIN') {
+  setInferenceResult(null);
+  setDiseaseInfo(null);
+  setError(
+    'The image could not be confidently identified as a leaf. Please use a clearer image showing the leaf.'
+  );
+  return;
+}
+
+const result = await runInference(imageUri);
         if (cancelled) return;
         console.log('[PlantCare][Scan] RESULT:', {
           diseaseClass: result.diseaseClass,
